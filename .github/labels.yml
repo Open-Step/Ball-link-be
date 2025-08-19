@@ -1,0 +1,21 @@
+- name: feat
+  color: "0E8A16"
+  description: 새로운 기능
+- name: bug
+  color: "D73A4A"
+  description: 버그 수정
+- name: chore
+  color: "6E7781"
+  description: 유지보수 / 리팩터링
+- name: backlog
+  color: "BFD4F2"
+  description: Backlog 상태
+- name: in-progress
+  color: "FBCA04"
+  description: 진행 중
+- name: review
+  color: "1D76DB"
+  description: 코드 리뷰 단계
+- name: done
+  color: "0E8A16"
+  description: 완료
