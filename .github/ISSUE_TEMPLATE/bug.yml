@@ -1,0 +1,27 @@
+name: "🐞 Bug Report"
+description: 버그 리포트
+title: "[BUG] "
+labels: ["bug", "backlog"]
+body:
+  - type: textarea
+    id: bug
+    attributes:
+      label: 버그 내용
+      placeholder: 로그인 시 500 에러 발생
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 방법
+      value: |
+        1. 로그인 페이지 접속
+        2. 계정 입력 후 로그인
+        3. 에러 발생
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: 스크린샷
+      description: 캡처 첨부
