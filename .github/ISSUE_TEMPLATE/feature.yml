@@ -1,0 +1,24 @@
+name: "✨ Feature Request"
+description: 새로운 기능 개발 요청
+title: "[FEAT] "
+labels: ["feat", "backlog"]
+body:
+  - type: textarea
+    id: desc
+    attributes:
+      label: 기능 설명
+      description: 어떤 기능을 추가하려는지 간단히 작성해주세요.
+      placeholder: 예) 팀 생성 API 추가
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 작업 항목
+      value: |
+        - [ ] DB 스키마 정의
+        - [ ] API 엔드포인트 작성
+        - [ ] 단위테스트 작성
+  - type: textarea
+    id: etc
+    attributes:
+      label: 참고사항
+      description: 관련 문서/링크
