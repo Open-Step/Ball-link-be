@@ -1,0 +1,17 @@
+name: "🛠️ Chore / Refactor"
+description: 리팩터링, 문서, 테스트 보강
+title: "[CHORE] "
+labels: ["chore", "backlog"]
+body:
+  - type: textarea
+    id: reason
+    attributes:
+      label: 작업 배경
+  - type: textarea
+    id: detail
+    attributes:
+      label: 작업 내용
+      value: |
+        - [ ] 코드 정리
+        - [ ] 주석 보강
+        - [ ] 로그 제거
