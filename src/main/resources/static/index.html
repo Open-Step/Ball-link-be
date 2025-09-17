@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Kakao Login & Password Reset Test</title>
+</head>
+<body>
+<h1>Auth Test Page</h1>
+
+<!-- 카카오 로그인 -->
+<button onclick="kakaoLogin()">카카오 로그인</button>
+<p id="tokens"></p>
+
+<hr>
+
+<!-- 비밀번호 초기화 요청 -->
+<h3>비밀번호 초기화 요청</h3>
+<input type="email" id="resetEmail" placeholder="이메일 입력" />
+<button onclick="requestReset()">Reset Password</button>
+<p id="resetResponse"></p>
+
+<hr>
+
+<!-- 이메일 수정 -->
+<h3>이메일 수정</h3>
+<input type="email" id="newEmail" placeholder="새 이메일 입력" />
+<button onclick="updateEmail()">Update Email</button>
+<p id="updateEmailResponse"></p>
+
+<hr>
+
+<!-- 비밀번호 재설정 -->
+<h3>비밀번호 재설정</h3>
+<input type="text" id="resetToken" placeholder="토큰 입력" />
+<input type="password" id="newPassword" placeholder="새 비밀번호 입력" />
+<button onclick="confirmReset()">Confirm Reset</button>
+<p id="confirmResponse"></p>
+<script>
+    // ==========================
+    // 🔑 카카오 로그인
+    // ==========================
+    function kakaoLogin() {
+        window.location.href =
+            "https://kauth.kakao.com/oauth/authorize?response_type=code" +
+            "&client_id=a1ea757a34a37aa2e3c994d86259cd40" +
+            "&redirect_uri=http://localhost:8080/api/v1/auth/kakao/callback";
+    }
+
+    // ==========================
+    // 📦 쿼리스트링에서 토큰 저장
+    // ==========================
+    function handleRedirectTokens() {
+        const params = new URLSearchParams(window.location.search);
+        const at = params.get("accessToken");
+        const rt = params.get("refreshToken");
+
+        if (at && rt) {
+            localStorage.setItem("accessToken", at);
+            localStorage.setItem("refreshToken", rt);
+            document.getElementById("tokens").innerText =
+                "AccessToken: " + at + "\nRefreshToken: " + rt;
+
+            // ✅ 주소창에서 토큰 제거 (보안상 깔끔하게)
+            window.history.replaceState({}, document.title, "/index.html");
+        }
+    }
+
+    // ==========================
+    // 📡 공통 fetch wrapper
+    // ==========================
+    async function authorizedFetch(url, options = {}) {
+        const token = localStorage.getItem("accessToken");
+        const headers = {
+            ...(options.headers || {}),
+            "Content-Type": "application/json",
+        };
+        if (token) {
+            headers["Authorization"] = "Bearer " + token;
+        }
+
+        return fetch(url, {
+            ...options,
+            headers
+        });
+    }
+
+    // ==========================
+    // 🔐 비밀번호 초기화 요청
+    // ==========================
+    async function requestReset() {
+        const email = document.getElementById("resetEmail").value;
+        const res = await authorizedFetch("/api/v1/auth/password-reset", {
+            method: "POST",
+            body: JSON.stringify({ email })
+        });
+
+        const data = await res.json();
+        document.getElementById("resetResponse").innerText = JSON.stringify(data);
+    }
+
+    // ==========================
+    // ✉️ 이메일 수정
+    // ==========================
+    async function updateEmail() {
+        const newEmail = document.getElementById("newEmail").value;
+        const res = await authorizedFetch("/api/v1/user/email", {
+            method: "PUT",
+            body: JSON.stringify({ email: newEmail })
+        });
+
+        if (res.ok) {
+            document.getElementById("updateEmailResponse").innerText = "✅ 이메일이 성공적으로 수정되었습니다.";
+        } else {
+            const err = await res.text();
+            document.getElementById("updateEmailResponse").innerText = "❌ 실패: " + err;
+        }
+    }
+    async function confirmReset() {
+        const token = document.getElementById("resetToken").value;
+        const newPassword = document.getElementById("newPassword").value;
+
+        const res = await fetch("/api/v1/auth/password-reset/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token, newPassword })
+        });
+
+        if (res.ok) {
+            document.getElementById("confirmResponse").innerText = "✅ 비밀번호가 성공적으로 변경되었습니다.";
+        } else {
+            const err = await res.text();
+            document.getElementById("confirmResponse").innerText = "❌ 실패: " + err;
+        }
+    }
+    // ==========================
+    // 🚀 페이지 로드 시 실행
+    // ==========================
+    window.onload = () => {
+        handleRedirectTokens();
+
+        const at = localStorage.getItem("accessToken");
+        const rt = localStorage.getItem("refreshToken");
+        if (at && rt) {
+            document.getElementById("tokens").innerText =
+                "AccessToken: " + at + "\nRefreshToken: " + rt;
+        }
+    }
+</script>
+</body>
+</html>
