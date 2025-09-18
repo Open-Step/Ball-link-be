@@ -1,18 +1,30 @@
 package com.openstep.balllinkbe.features.team_manage.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.LocalDate;
 
 @Getter
 @Setter
 public class CreateTeamRequest {
-    private String name;          // 팀명
-    private String shortName;     // 팀 약칭
-    private Short foundedYear;  // 창단년도
-    private String region;        // 활동 지역
-    private String ownerName;     // 대표자 이름 (DB에는 저장X, 응답용/프론트 표시용)
-    private String description;   // 소개
-    private String emblemFileId;  // 엠블럼 파일 ID
-    private String colorPrimary;  // 팀 대표 색상
-    private Boolean isPublic;     // 공개 여부 (추가 컬럼 고려)
+    @NotBlank(message = "팀 이름은 필수입니다.")
+    private String name;
+
+    private String shortName;
+
+    @NotNull(message = "창립일은 필수입니다.")
+    private LocalDate foundedAt;
+
+    private String region;
+
+    private String ownerName;
+    private String description;
+
+    // CDN URL
+    private String emblemUrl;
+
+    private Boolean isPublic = true;
 }
