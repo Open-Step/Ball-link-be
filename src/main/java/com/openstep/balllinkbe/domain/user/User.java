@@ -29,4 +29,9 @@ public class User {
     private LocalDateTime updatedAt;
 
     public enum Gender { M, F }
+
+    /** ID-only 생성자 (FK 매핑용) */
+    public User(Long id) {
+        this.id = id;
+    }
 }

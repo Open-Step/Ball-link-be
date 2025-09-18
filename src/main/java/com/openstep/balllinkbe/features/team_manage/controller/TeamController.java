@@ -4,6 +4,7 @@ import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.features.team_manage.dto.request.CreateTeamRequest;
 import com.openstep.balllinkbe.features.team_manage.dto.request.UpdateTeamRequest;
+import com.openstep.balllinkbe.features.team_manage.dto.response.TeamDetailResponse;
 import com.openstep.balllinkbe.features.team_manage.dto.response.TeamResponse;
 import com.openstep.balllinkbe.features.team_manage.dto.response.TeamSummaryResponse;
 import com.openstep.balllinkbe.features.team_manage.service.TeamService;
@@ -20,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -28,6 +30,15 @@ import java.util.Map;
 @Tag(name = "team-controller", description = "팀 관리 API (생성, 조회, 수정, 삭제, 탈퇴)")
 public class TeamController {
     private final TeamService teamService;
+
+    /* 사용자가 가입한 팀 목록(사용자는 최대 3개의 팀에 들어갈 수 있음 */
+    @GetMapping("/me")
+    @Operation(summary = "내가 가입한 팀 목록 조회", description = "로그인 사용자가 가입한 팀 목록 (최대 3개) 조회")
+    public ResponseEntity<List<TeamSummaryResponse>> getMyTeams(
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(teamService.getMyTeams(currentUser));
+    }
 
     /** 팀 생성 */
     @PostMapping
@@ -75,13 +86,13 @@ public class TeamController {
         return ResponseEntity.ok(teamService.getTeams(page, size, sort, q));
     }
 
-    /** 팀 상세 조회 */
     @GetMapping("/{teamId}")
     @Operation(summary = "팀 상세 조회", description = "팀의 상세 정보를 조회합니다.")
-    public ResponseEntity<TeamResponse> getTeamDetail(@PathVariable Long teamId) {
-        TeamResponse response = teamService.getTeamDetail(teamId);
+    public ResponseEntity<TeamDetailResponse> getTeamDetail(@PathVariable Long teamId) {
+        TeamDetailResponse response = teamService.getTeamDetail(teamId);
         return ResponseEntity.ok(response);
     }
+
 
     /** 팀 해산(삭제) */
     @DeleteMapping("/{teamId}")

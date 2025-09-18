@@ -13,7 +13,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(name = "teams")
+@Table(
+        name = "teams",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_team_name_tag", columnNames = {"name", "team_tag"})
+        }
+)
 public class Team {
 
     @Id
@@ -22,6 +27,9 @@ public class Team {
 
     @Column(nullable = false, length = 120)
     private String name;
+
+    @Column(name = "team_tag", length = 4, nullable = false)
+    private String teamTag;   // 팀 고유 태그 (0001~9999)
 
     @Column(name = "short_name", length = 255)
     private String shortName;
@@ -38,7 +46,6 @@ public class Team {
     @Column(name = "is_public", nullable = false)
     private Boolean isPublic = true;
 
-    // emblemFile → emblemUrl 로 변경 (CDN URL만 저장)
     @Column(name = "emblem_url", length = 500)
     private String emblemUrl;
 
@@ -49,4 +56,9 @@ public class Team {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
+
+    /** ID-only 생성자 (프록시용) */
+    public Team(Long id) {
+        this.id = id;
+    }
 }

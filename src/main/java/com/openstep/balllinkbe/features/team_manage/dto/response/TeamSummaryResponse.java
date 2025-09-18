@@ -7,12 +7,16 @@ import lombok.Getter;
 public class TeamSummaryResponse {
     private final Long id;
     private final String name;
+    private final String teamTag;   // 추가
+    private final String displayName; // name#tag
     private final String region;
     private final String emblemUrl;
 
     public TeamSummaryResponse(Team team) {
         this.id = team.getId();
         this.name = team.getName();
+        this.teamTag = team.getTeamTag();
+        this.displayName = team.getName() + "#" + team.getTeamTag();
         this.region = team.getRegion();
         this.emblemUrl = team.getEmblemUrl();
     }

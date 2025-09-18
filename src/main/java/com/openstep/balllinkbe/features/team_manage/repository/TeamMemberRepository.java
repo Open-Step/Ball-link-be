@@ -21,6 +21,9 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     // 팀 + 유저로 멤버 조회 (탈퇴/위임 처리 시 필요)
     Optional<TeamMember> findByTeamAndUser(Team team, User user);
 
-    // 팀 + 유저 삭제
-    void deleteByTeamAndUser(Team team, User user);
+    Optional<TeamMember> findByTeamIdAndUserId(Long teamId, Long userId);
+
+    long countByTeamIdAndRoleAndLeftAtIsNull(Long teamId, TeamMember.Role role);
+
+    List<TeamMember> findByUserIdAndLeftAtIsNull(Long userId);
 }

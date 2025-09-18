@@ -20,7 +20,6 @@ public class CreateTeamRequest {
 
     private String region;
 
-    private String ownerName;
     private String description;
 
     // CDN URL
