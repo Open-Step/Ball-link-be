@@ -27,6 +27,11 @@ public class SecurityConfig {
 
                 // 인가 규칙
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         // 테스트용 정적 리소스 허용
                         .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()  // 회원가입, 로그인, 카카오 콜백은 인증 없이 허용
