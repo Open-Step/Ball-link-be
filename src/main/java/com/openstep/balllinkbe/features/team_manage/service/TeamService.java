@@ -1,0 +1,178 @@
+package com.openstep.balllinkbe.features.team_manage.service;
+
+import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.TeamMember;
+import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.team_manage.dto.request.CreateTeamRequest;
+import com.openstep.balllinkbe.features.team_manage.dto.request.UpdateTeamRequest;
+import com.openstep.balllinkbe.features.team_manage.dto.response.TeamDetailResponse;
+import com.openstep.balllinkbe.features.team_manage.dto.response.TeamSummaryResponse;
+import com.openstep.balllinkbe.features.team_manage.repository.PlayerRepository;
+import com.openstep.balllinkbe.features.team_manage.repository.TeamMemberRepository;
+import com.openstep.balllinkbe.features.team_manage.repository.TeamRepository;
+import com.openstep.balllinkbe.features.user.repository.UserRepository;
+import com.openstep.balllinkbe.global.exception.CustomException;
+import com.openstep.balllinkbe.global.exception.ErrorCode;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class TeamService {
+
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
+    private final PlayerRepository playerRepository;
+
+    /** 내가 가입한 팀 목록 (최대 3개) */
+    public List<TeamSummaryResponse> getMyTeams(User currentUser) {
+        var memberships = teamMemberRepository.findByUserIdAndLeftAtIsNull(currentUser.getId());
+
+        return memberships.stream()
+                .map(TeamMember::getTeam)
+                .limit(3) // 최대 3개
+                .map(TeamSummaryResponse::new)
+                .toList();
+    }
+
+    /** 팀 생성 */
+    @Transactional
+    public Long createTeam(CreateTeamRequest dto, User currentUser) {
+        User owner = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        Team team = new Team();
+        team.setName(dto.getName());
+        team.setShortName(dto.getShortName());
+        team.setFoundedAt(dto.getFoundedAt());
+        team.setRegion(dto.getRegion());
+        team.setDescription(dto.getDescription());
+        team.setEmblemUrl(dto.getEmblemUrl());
+        team.setIsPublic(dto.getIsPublic() != null ? dto.getIsPublic() : true);
+        team.setOwnerUser(owner);
+        team.setCreatedAt(LocalDateTime.now());
+
+        // teamTag 생성
+        String tag = generateUniqueTeamTag(dto.getName());
+        team.setTeamTag(tag);
+
+        Team saved = teamRepository.save(team);
+
+        TeamMember member = new TeamMember();
+        member.setTeam(saved);
+        member.setUser(owner);
+        member.setRole(TeamMember.Role.LEADER);
+        teamMemberRepository.save(member);
+
+        return saved.getId();
+    }
+
+    /** 고유 4자리 태그 생성 */
+    private String generateUniqueTeamTag(String teamName) {
+        String tag;
+        do {
+            tag = String.format("%04d", (int) (Math.random() * 10000)); // 0000~9999
+        } while (teamRepository.existsByNameAndTeamTag(teamName, tag));
+        return tag;
+    }
+
+    /** 팀 수정 (owner만 가능) */
+    @Transactional
+    public Team updateTeam(Long teamId, UpdateTeamRequest dto, User currentUser) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+
+        if (team.getOwnerUser() == null ||
+                !team.getOwnerUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
+
+        if (dto.getDescription() != null) team.setDescription(dto.getDescription());
+        if (dto.getFoundedAt() != null) team.setFoundedAt(dto.getFoundedAt());
+        if (dto.getIsPublic() != null) team.setIsPublic(dto.getIsPublic());
+        if (dto.getEmblemUrl() != null) team.setEmblemUrl(dto.getEmblemUrl());
+
+        team.setUpdatedAt(LocalDateTime.now());
+        return teamRepository.save(team);
+    }
+
+    /** 팀 목록 조회 (공개팀만) */
+    public Page<TeamSummaryResponse> getTeams(int page, int size, String sort, String q) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sort.split(",")));
+        Page<Team> teams;
+
+        if (q != null && !q.isBlank()) {
+            teams = teamRepository.findByNameContainingAndIsPublicTrue(q, pageable);
+        } else {
+            teams = teamRepository.findByIsPublicTrue(pageable);
+        }
+
+        return teams.map(TeamSummaryResponse::new);
+    }
+
+    /** 팀 상세 조회 */
+    public TeamDetailResponse getTeamDetail(Long teamId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+
+        long playerCount = playerRepository.countByTeamIdAndIsActiveTrue(teamId);
+
+        return new TeamDetailResponse(team, playerCount);
+    }
+
+    /** 팀 삭제 (soft delete, owner만 가능) */
+    @Transactional
+    public void deleteTeam(Long teamId, User currentUser) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+
+        if (!team.getOwnerUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
+
+        team.setDeletedAt(LocalDateTime.now());
+        teamRepository.save(team);
+    }
+
+    /** 팀 탈퇴 */
+    @Transactional
+    public void leaveTeam(Long teamId, User currentUser, Long transferToUserId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+
+        var member = teamMemberRepository.findByTeamAndUser(team, currentUser)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        if (!team.getOwnerUser().getId().equals(currentUser.getId())) {
+            teamMemberRepository.delete(member);
+            return;
+        }
+
+        if (transferToUserId != null) {
+            User newOwner = userRepository.findById(transferToUserId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+            var newOwnerMember = teamMemberRepository.findByTeamAndUser(team, newOwner)
+                    .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+            team.setOwnerUser(newOwner);
+            newOwnerMember.setRole(TeamMember.Role.LEADER);
+            member.setRole(TeamMember.Role.PLAYER);
+
+            teamRepository.save(team);
+            teamMemberRepository.save(newOwnerMember);
+            teamMemberRepository.save(member);
+
+        } else {
+            team.setDeletedAt(LocalDateTime.now());
+            teamRepository.save(team);
+        }
+    }
+}
+

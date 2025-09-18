@@ -40,6 +40,9 @@ dependencies {
     // PasswordEncoder (BCrypt)
     implementation 'org.springframework.security:spring-security-crypto'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // Swagger 추가
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
+
 
 }
 
