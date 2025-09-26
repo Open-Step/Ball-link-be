@@ -9,17 +9,17 @@ import java.time.LocalDate;
 public class TeamDetailResponse {
     private final Long id;
     private final String name;
-    private final String teamTag;     // 추가
-    private final String displayName; // name#tag
+    private final String teamTag;
+    private final String displayName;
     private final String shortName;
     private final String description;
     private final LocalDate foundedAt;
     private final Boolean isPublic;
-    private final String emblemUrl;
+    private final String emblemUrl; // CDN 붙은 URL
     private final String ownerName;
     private final long playerCount;
 
-    public TeamDetailResponse(Team team, long playerCount) {
+    public TeamDetailResponse(Team team, long playerCount, String cdnUrl) {
         this.id = team.getId();
         this.name = team.getName();
         this.teamTag = team.getTeamTag();
@@ -28,7 +28,7 @@ public class TeamDetailResponse {
         this.description = team.getDescription();
         this.foundedAt = team.getFoundedAt();
         this.isPublic = team.getIsPublic();
-        this.emblemUrl = team.getEmblemUrl();
+        this.emblemUrl = cdnUrl; // CDN URL 적용
         this.ownerName = team.getOwnerUser() != null ? team.getOwnerUser().getName() : null;
         this.playerCount = playerCount;
     }
