@@ -22,7 +22,16 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "팀 멤버를 찾을 수 없습니다."),
     PLAYER_NOT_FOUND(HttpStatus.NOT_FOUND, "선수를 찾을 수 없습니다."),
     DUPLICATE_TEAM_TAG(HttpStatus.CONFLICT, "팀 태그가 중복되었습니다."),
-    MAX_TEAM_LIMIT(HttpStatus.BAD_REQUEST, "최대 가입 가능한 팀 수를 초과했습니다.");
+    MAX_TEAM_LIMIT(HttpStatus.BAD_REQUEST, "최대 가입 가능한 팀 수를 초과했습니다."),
+
+    // Invite
+    INVALID_INVITE(HttpStatus.BAD_REQUEST, "유효하지 않은 초대 코드입니다."),
+    INVITE_NOT_FOUND(HttpStatus.NOT_FOUND, "초대 코드를 찾을 수 없습니다."),
+    INVITE_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 회수된 초대 코드입니다."),
+
+    // JoinRequest
+    JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "가입 신청을 찾을 수 없습니다."),
+    JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "이미 처리된 가입 신청입니다.");
 
     private final HttpStatus status;
     private final String message;
