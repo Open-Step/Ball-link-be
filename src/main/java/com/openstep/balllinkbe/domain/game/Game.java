@@ -46,6 +46,12 @@ public class Game {
 
     private LocalDateTime createdAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "is_scrimmage", nullable = false)
+    private boolean isScrimmage = false;
+
     public enum RoundCode { GROUP, ROUND_OF_16, QF, SF, FINAL }
     public enum State { SCHEDULED, ONGOING, FINISHED, CANCELED }
 }
