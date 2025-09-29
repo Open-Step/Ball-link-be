@@ -14,6 +14,7 @@ public class PlayerRecordDto {
     private int backNumber;
     private int gameCount;
     private int pts;
+    private int ast;
     private int reb;
     private int stl;
     private int blk;
@@ -23,7 +24,7 @@ public class PlayerRecordDto {
 
     public PlayerRecordDto(
             Integer rank, Long playerId, String playerName, Short backNumber,
-            Long gameCount, Long pts, Long reb, Long stl, Long blk, Long fg2, Long fg3, Long ft
+            Long gameCount, Long pts, Long ast,Long reb, Long stl, Long blk, Long fg2, Long fg3, Long ft
     ) {
         this.rank = rank == null ? 0 : rank;
         this.playerId = playerId;
@@ -31,6 +32,7 @@ public class PlayerRecordDto {
         this.backNumber = backNumber == null ? 0 : backNumber;
         this.gameCount = gameCount == null ? 0 : gameCount.intValue();
         this.pts = pts == null ? 0 : pts.intValue();
+        this.ast = ast == null ? 0 : ast.intValue();
         this.reb = reb == null ? 0 : reb.intValue();
         this.stl = stl == null ? 0 : stl.intValue();
         this.blk = blk == null ? 0 : blk.intValue();

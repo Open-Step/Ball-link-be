@@ -17,6 +17,7 @@ public class TournamentTeamController {
     private final TournamentService  tournamentService;
 
     /** 팀 통산기록(시즌/전체) **/
+    /** TODO : wins, losses 표시할만한 컬럼 필요 **/
     @GetMapping("/records")
     @Operation(summary = "팀 통산기록(시즌/전체)", description = "팀 전체 시즌/특정 시즌의 누적 및 경기당 통계")
     public ResponseEntity<?> getTeamRecords(
@@ -32,6 +33,7 @@ public class TournamentTeamController {
         // "losses":17,
         // "totals":{...},
         // "perGame":{...} }
+        return ResponseEntity.ok(null);
     }
 
     /**선수 통산기록(팀단위) **/
@@ -43,21 +45,6 @@ public class TournamentTeamController {
             @RequestParam(name = "size", defaultValue = "20") int size,
             @RequestParam(name = "rankBy", defaultValue = "pts") String rankBy
     ) {
-        //{ "teamId":17,
-        // "season":"ALL",
-        // "split":"TOTAL",
-        // "rankBy":"pts",
-        // "items":[ {
-        //      "rank":1,
-        //      "playerId":99,
-        //      "playerName":"홍길동",
-        //      "backNumber":23,
-        //      "games":34,
-        //      "totals":{...}
-        //  } ],
-        // "page":0,
-        // "size":50,
-        // "total":27 }
         return ResponseEntity.ok(tournamentService.getPlayerCareerRecords(teamId, page, size, rankBy));
     }
 
@@ -67,9 +54,9 @@ public class TournamentTeamController {
     public ResponseEntity<?> getTeamRecords(
             @PathVariable Long teamId,
             @PathVariable Long playerId,
-            @RequestParam(name = "page") int page,
-            @RequestParam(name = "size") int size,
-            @RequestParam(name = "rankBy") String rankBy
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
+            @RequestParam(name = "rankBy", defaultValue = "pts") String rankBy
     ) {
         //{ "page":0,
         // "size":20,
@@ -88,18 +75,20 @@ public class TournamentTeamController {
         //          "pts":512 }
         //       }]
         // }
+        return ResponseEntity.ok(null);
     }
 
     /** 팀 대회목록 조회 **/
+    /** TODO : wins, losses 표시할만한 컬럼 필요 **/
     @GetMapping("/tournaments/participations")
     @Operation(summary = "팀 대회목록 조회", description = "해당 팀이 참여한 대회 요약 목록")
     public ResponseEntity<?> getTeamRecords(
-            @PathVariable String teamId,
+            @PathVariable Long teamId,
             @RequestParam(name = "season") String season,
             @RequestParam(name = "status") String status,
-            @RequestParam(name = "page") int page,
-            @RequestParam(name = "size") int size,
-            @RequestParam(name = "rankBy") String rankBy
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
+            @RequestParam(name = "rankBy", defaultValue = "pts") String rankBy
     ) {
         //{ "page":0,
         // "size":20,

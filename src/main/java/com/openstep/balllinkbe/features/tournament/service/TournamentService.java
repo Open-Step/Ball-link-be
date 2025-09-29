@@ -3,16 +3,16 @@ package com.openstep.balllinkbe.features.tournament.service;
 import com.openstep.balllinkbe.features.tournament.dto.response.ParticipationRecordResponse;
 import com.openstep.balllinkbe.features.tournament.dto.response.PlayerCareerRecordResponse;
 import com.openstep.balllinkbe.features.tournament.dto.response.PlayerRecordDto;
+import com.openstep.balllinkbe.features.tournament.dto.response.TeamRecordDto;
 import com.openstep.balllinkbe.features.tournament.repository.GamePlayerStatRepository;
-import com.openstep.balllinkbe.features.tournament.repository.GameRepository;
-import com.openstep.balllinkbe.features.tournament.repository.GameTeamStatsRepository;
+import com.openstep.balllinkbe.features.tournament.repository.GameTeamStatRepository;
 import com.openstep.balllinkbe.features.tournament.repository.TournamentRepository;
+import com.openstep.balllinkbe.global.exception.CustomException;
+import com.openstep.balllinkbe.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,8 +23,7 @@ import java.util.List;
 public class TournamentService {
 
     private final TournamentRepository tournamentRepository;
-    private final GameRepository gameRepository;
-    private final GameTeamStatsRepository gameTeamStatsRepository;
+    private final GameTeamStatRepository gameTeamStatRepository;
     private final GamePlayerStatRepository gamePlayerStatRepository;
 
     /*  특정 대회에서 해당 팀의 누적/경기당 기록 조회 */
@@ -40,49 +39,34 @@ public class TournamentService {
     }
 
     /*  팀 대회목록 조회  */
-    //{ "page":0,
-    // "size":20,
-    // "total":5,
-    // "items":[ {
-    //      "gameId":101,      //Game -> id
-    //      "date":"2025-05-01",//Game -> scheduled_at
-    //      "opponent":"YBC", //Game -> opponent_name
-    //      "pts":17,        //Game_team_stats -> pts
-    //      "reb":4,         // // Game_team_stats -> reb
-    //      "ast":3,         // Game_team_stats -> ast
-    //      "stl":2,         // Game_team_stats -> stl
-    //      "blk":0,         // Game_team_stats -> blk
-    //      "fg2":{...},
-    //      "fg3":{...},
-    //      "ft":{...}
-    //    } ]
-    // }
-    public Object getTeamRecords(String teamId, String season, String status, int page, int size, String rankBy) {
+    /* TODO : game_team_stats에는 fg2, fg3, ft가 없는데 맞는지 확인 */
+    /** fg2, fg3, ft를 팀단위, 토너먼트단위로 구하려면 game_player_stat를 다시 조인해야하는데
+     * 그보다는 기존에 저장되어있는 game_team_states에 fg2, fg3, ft 추가하는게 낫지않을까 싶음.
+     *
+     * 추가로 season, status는 깡통 값이라서 사용안했는데, 사용시에는 쿼리문에 where문 더해주면 됨 . **/
+    public Page<TeamRecordDto> getTeamRecords(Long teamId, String season, String status, int page, int size, String rankBy) {
+        Pageable pageable = PageRequest.of(page, size);
+        //해당 토너먼트에서 있었던 게임들 찾기 Map<토너먼트아이디, List<게임아이디들>>
+        // 토너먼트아이디1 -> { 게임아이디1, 게임아이디2, 게임아이디2 ... }
+        // 토너먼트아이디2 -> { 게임아이디10, 게임아이디11, 게임아이디12 ...}
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(rankBy).ascending());
+        // 각 토너먼트 안에서 경기 수, 총 득점, 어시, 리바운드, 스틸, 블록, 2점, 3점, 자유투 값 더해서 가져오기
+        // 토너먼트아이디1 -> { 경기수, 총 득점, 어시, 리바운드, 스틸, 블록, 2점, 3점, 자유투}
+        // 토너먼트아이디1 -> { 경기수, 총 득점, 어시, 리바운드, 스틸, 블록, 2점, 3점, 자유투}
 
-
+        //  한방쿼리로 한다면
+        // game + game_team_stat -> teamId로 필터링 후 tournament로 그룹핑
+        //페이로드 조립
+        return gameTeamStatRepository.findTeamRecordsByTournamentId(teamId, pageable);
     }
 
-
-    //{ "teamId":17,
-    // "season":"ALL",
-    // "split":"TOTAL",
-    // "rankBy":"pts",
-    // "items":[ {
-    //      "rank":1,
-    //      "playerId":99,
-    //      "playerName":"홍길동",
-    //      "backNumber":23,
-    //      "games":34,
-    //      "totals":{...}
-    //  } ],
-    // "page":0,
-    // "size":50,
-    // "total":27 }
     public PlayerCareerRecordResponse getPlayerCareerRecords(Long teamId, int page, int size, String rankBy) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(rankBy).ascending());
+        Pageable pageable = PageRequest.of(page, size);
         Page<PlayerRecordDto> records = gamePlayerStatRepository.findPlayerRecordsByTeam(teamId,rankBy,pageable);
+
+        if(records.getTotalElements() == 0){
+            throw new CustomException(ErrorCode.MEMBER_NOT_FOUND);
+        }
 
         int base = records.getNumber() * records.getSize();
 
