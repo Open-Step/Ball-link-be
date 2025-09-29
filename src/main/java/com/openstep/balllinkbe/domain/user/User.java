@@ -34,4 +34,6 @@ public class User {
     public User(Long id) {
         this.id = id;
     }
+
+    private String profileImagePath; // DB에는 상대경로 저장
 }

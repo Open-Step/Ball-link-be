@@ -22,8 +22,5 @@ public class CreateTeamRequest {
 
     private String description;
 
-    // CDN URL
-    private String emblemUrl;
-
     private Boolean isPublic = true;
 }
