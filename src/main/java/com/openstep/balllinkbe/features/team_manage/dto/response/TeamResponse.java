@@ -14,22 +14,22 @@ public class TeamResponse {
     private LocalDate foundedAt;
     private String region;
     private String description;
-    private String emblemUrl;
+    private String emblemUrl; // CDN 붙은 URL
     private Boolean isPublic;
     private String ownerName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public TeamResponse(Team team) {
+    public TeamResponse(Team team, String cdnUrl) {
         this.id = team.getId();
         this.name = team.getName();
         this.shortName = team.getShortName();
         this.foundedAt = team.getFoundedAt();
         this.region = team.getRegion();
         this.description = team.getDescription();
-        this.emblemUrl = team.getEmblemUrl();
+        this.emblemUrl = cdnUrl; // CDN URL 적용
         this.isPublic = team.getIsPublic();
-        this.ownerName = team.getOwnerUser().getName(); // User 엔티티에 name 있다고 가정
+        this.ownerName = team.getOwnerUser() != null ? team.getOwnerUser().getName() : null;
         this.createdAt = team.getCreatedAt();
         this.updatedAt = team.getUpdatedAt();
     }
