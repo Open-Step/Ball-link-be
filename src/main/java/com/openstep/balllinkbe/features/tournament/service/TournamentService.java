@@ -39,10 +39,8 @@ public class TournamentService {
     }
 
     /*  팀 대회목록 조회  */
-    /* TODO : game_team_stats에는 fg2, fg3, ft가 없는데 맞는지 확인 */
     /** fg2, fg3, ft를 팀단위, 토너먼트단위로 구하려면 game_player_stat를 다시 조인해야하는데
      * 그보다는 기존에 저장되어있는 game_team_states에 fg2, fg3, ft 추가하는게 낫지않을까 싶음.
-     *
      * 추가로 season, status는 깡통 값이라서 사용안했는데, 사용시에는 쿼리문에 where문 더해주면 됨 . **/
     public Page<TeamRecordDto> getTeamRecords(Long teamId, String season, String status, int page, int size, String rankBy) {
         Pageable pageable = PageRequest.of(page, size);
@@ -79,8 +77,8 @@ public class TournamentService {
 
         return PlayerCareerRecordResponse.builder()
                 .teamId(teamId)
-                .season("FULL")
-                .split("BOTH")
+                .season("FULL") //어디서 가져와야하는건지
+                .split("BOTH")  //몰라서 기본값으로 일단 집어넣음 << PRE-GAME|TOTAL|BOTH 가 각각어떤 옵션인지
                 .rankBy(rankBy)
                 .items(items)
                 .page(records.getNumber())
