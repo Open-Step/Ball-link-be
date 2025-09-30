@@ -24,15 +24,15 @@ public class TeamRecordDto {
 
     public TeamRecordDto(
             Long tournamentId, String tournamentName,
-            Long gameCount, //Long wins, Long losses,
+            Long gameCount, Long wins, Long losses,
             Long pts, Long ast, Long reb, Long stl, Long blk, Long fg2, Long fg3, Long ft
     ){
         this.tournamentId = tournamentId;
         this.tournamentName = tournamentName;
 
         this.gameCount = gameCount == null ? 0 : gameCount.intValue();
-        //this.wins = wins == null ? 0 : wins.intValue();
-        //this.losses = losses == null ? 0 : losses.intValue();
+        this.wins = wins == null ? 0 : wins.intValue();
+        this.losses = losses == null ? 0 : losses.intValue();
 
         this.pts = pts == null ? 0 : pts.intValue();
         this.ast = ast == null ? 0 : ast.intValue();
