@@ -45,6 +45,8 @@ dependencies {
     // NCP S3 추가
     implementation 'software.amazon.awssdk:s3:2.20.40'
 
+    implementation 'com.itextpdf:itext7-core:7.2.5'
+    implementation 'com.itextpdf:layout:7.2.5'
 }
 
 tasks.named('test') {

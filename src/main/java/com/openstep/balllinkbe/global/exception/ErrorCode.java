@@ -35,7 +35,16 @@ public enum ErrorCode {
 
     // File
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
-    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다.");
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
+
+    // Venue
+    VENUE_NOT_FOUND(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."),
+
+    // Game
+    GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "게임을 찾을 수 없습니다."),
+
+    // PDF
+    PDF_EXPORT_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PDF 생성 중 오류가 발생했습니다.");
 
     private final HttpStatus status;
     private final String message;
