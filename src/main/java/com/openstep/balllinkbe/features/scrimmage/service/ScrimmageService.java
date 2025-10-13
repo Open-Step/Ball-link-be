@@ -7,6 +7,7 @@ import com.openstep.balllinkbe.domain.game.GameEvent;
 import com.openstep.balllinkbe.domain.game.GameLineupPlayer;
 import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.TeamMember;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.domain.venue.Venue;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.AddGuestRequest;
@@ -35,7 +36,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -67,8 +67,11 @@ public class ScrimmageService {
     public CreateScrimmageResponse createScrimmage(Long teamId, User currentUser, CreateScrimmageRequest createScrimmageDto) {
 
         // 팀장/매니저 권한 검증
-        teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
+        TeamMember teamMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        if (teamMember.getRole().equals(TeamMember.Role.PLAYER)){
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
 
         // 홈 팀 조회
         Team team = teamRepository.findById(teamId)
@@ -238,8 +241,11 @@ public class ScrimmageService {
                 .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
 
         // 팀장/매니저 권한 검증
-        teamMemberRepository.findByTeamIdAndUserId(game.getHomeTeam().getId(), currentUser.getId())
+        TeamMember teamMember = teamMemberRepository.findByTeamIdAndUserId(game.getHomeTeam().getId(), currentUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        if (teamMember.getRole().equals(TeamMember.Role.PLAYER)){
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
 
         // 경기 이벤트 조회
         List<GameEvent> events = gameEventRepository.findByGameIdOrderByTsAsc(gameId);
@@ -278,7 +284,6 @@ public class ScrimmageService {
         // 경기 상태 업데이트 (종료 및 소프트 삭제)
         game.setState(Game.State.FINISHED);
         game.setFinishedAt(LocalDateTime.now());
-        game.setDeletedAt(LocalDateTime.now());
         // 명시적 저장
         gameRepository.save(game);
 
@@ -305,8 +310,11 @@ public class ScrimmageService {
         Long teamId = game.getHomeTeam().getId();
 
         // 팀장/매니저 권한 검증
-        teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
+        TeamMember teamMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        if (teamMember.getRole().equals(TeamMember.Role.PLAYER)){
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
 
         // 자체전 삭제
         game.setDeletedAt(LocalDateTime.now());
@@ -319,6 +327,7 @@ public class ScrimmageService {
      * @param gameId 게임(자체전) 식별자
      * @param currentUser 팀장/매니저
      */
+    @Transactional
     public SuccessResponse restoreScrimmage(Long gameId, User currentUser) {
 
         // 자체전 조회
@@ -329,8 +338,11 @@ public class ScrimmageService {
         Long teamId = game.getHomeTeam().getId();
 
         // 팀장/매니저 권한 검증
-        teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
+        TeamMember teamMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        if (teamMember.getRole().equals(TeamMember.Role.PLAYER)){
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
 
         // 자체전 복원
         game.setDeletedAt(null);
