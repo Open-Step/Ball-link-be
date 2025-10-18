@@ -10,23 +10,27 @@ import java.time.LocalDateTime;
 @Table(name = "game_events")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class GameEvent {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "game_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "game_id")
     private Game game;
 
     private LocalDateTime ts;
     private int period;
     private String clockTime;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "team_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
     private Team team;
 
     @Enumerated(EnumType.STRING)
     private GameLineupPlayer.Side teamSide;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "player_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player_id")
     private Player player;
 
     @Enumerated(EnumType.STRING)
@@ -41,6 +45,8 @@ public class GameEvent {
         REBOUND_O, REBOUND_D,
         PERIOD_START, PERIOD_END,
         CLOCK_UPDATE, SHOTCLOCK_RESET,
-        NOTE
+        NOTE,
+        POSSESSION_CHANGE,
+        GAME_FINISH
     }
 }
