@@ -1,12 +1,7 @@
 package com.openstep.balllinkbe.features.team_record.repository;
 
 import com.openstep.balllinkbe.domain.game.GameTeamStat;
-import com.openstep.balllinkbe.features.team_record.repository.projection.GameHeaderProjection;
-import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerAggregateProjection;
-import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerGameProjection;
-import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerLineProjection;
-import com.openstep.balllinkbe.features.team_record.repository.projection.TournamentAggProjection;
-import com.openstep.balllinkbe.features.team_record.repository.projection.TournamentGameProjection;
+import com.openstep.balllinkbe.features.team_record.repository.projection.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,7 +18,6 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
     /* ───────────────────────────────
      *  1) 팀 대회참가기록 / 2) 팀 통산기록
      * ─────────────────────────────── */
-
     @Query("""
         SELECT s 
         FROM GameTeamStat s 
@@ -46,7 +40,7 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
     List<GameTeamStat> findByTeamIdAndSeason(@Param("teamId") Long teamId,
                                              @Param("season") String season);
 
-    /* 승/패 카운트 (대회/시즌) — 상대팀과 점수 비교 */
+    /* 승/패 카운트 (대회/시즌) */
     @Query(value = """
         SELECT SUM(CASE WHEN s.pts > opp.pts THEN 1 ELSE 0 END) 
         FROM game_team_stats s
@@ -55,8 +49,7 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
         WHERE g.tournament_id = :tournamentId
           AND s.team_id = :teamId
     """, nativeQuery = true)
-    Integer countWinsInTournament(@Param("tournamentId") Long tournamentId,
-                                  @Param("teamId") Long teamId);
+    Integer countWinsInTournament(@Param("tournamentId") Long tournamentId, @Param("teamId") Long teamId);
 
     @Query(value = """
         SELECT SUM(CASE WHEN s.pts < opp.pts THEN 1 ELSE 0 END) 
@@ -66,8 +59,7 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
         WHERE g.tournament_id = :tournamentId
           AND s.team_id = :teamId
     """, nativeQuery = true)
-    Integer countLossesInTournament(@Param("tournamentId") Long tournamentId,
-                                    @Param("teamId") Long teamId);
+    Integer countLossesInTournament(@Param("tournamentId") Long tournamentId, @Param("teamId") Long teamId);
 
     @Query(value = """
         SELECT SUM(CASE WHEN s.pts > opp.pts THEN 1 ELSE 0 END)
@@ -90,7 +82,6 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
           AND (:season = 'ALL' OR t.season = :season)
     """, nativeQuery = true)
     Integer countLossesInSeason(@Param("teamId") Long teamId, @Param("season") String season);
-
 
     /* ───────────────────────────────
      *  3) 선수 통산 집계 (랭킹)
@@ -122,7 +113,6 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
     List<PlayerAggregateProjection> aggregatePlayerStats(@Param("teamId") Long teamId,
                                                          @Param("season") String season);
 
-
     /* ───────────────────────────────
      *  4) 선수 경기별 기록 (페이징)
      * ─────────────────────────────── */
@@ -146,7 +136,6 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
                                                @Param("playerId") Long playerId,
                                                @Param("season") String season,
                                                Pageable pageable);
-
 
     /* ───────────────────────────────
      *  5) 팀 대회목록 요약
@@ -174,7 +163,6 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
     """, nativeQuery = true)
     List<TournamentAggProjection> findTournamentSummaries(@Param("teamId") Long teamId,
                                                           @Param("season") String season);
-
 
     /* ───────────────────────────────
      *  6) 대회 내 경기목록 (팀 관점, Page)
@@ -217,9 +205,8 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
                                                        @Param("status") String status,
                                                        Pageable pageable);
 
-
     /* ───────────────────────────────
-     *  7) 경기 박스스코어 (헤더/팀합계/선수라인)
+     *  7) 경기 박스스코어 (헤더/팀합계/선수라인) + 쿼터 득점
      * ─────────────────────────────── */
     @Query(value = """
         SELECT 
@@ -266,4 +253,34 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
         ORDER BY s.team.id, COALESCE(s.player.number, 999), s.player.name
     """)
     List<PlayerLineProjection> findPlayerLines(@Param("gameId") Long gameId);
+
+    // 팀 쿼터 득점
+    @Query(value = """
+        SELECT ge.team_id AS teamId,
+               ge.period  AS period,
+               SUM(COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(ge.meta,'$.pts')) AS SIGNED),0)) AS pts
+        FROM game_events ge
+        WHERE ge.game_id = :gameId
+          AND ge.type = 'SCORE'
+        GROUP BY ge.team_id, ge.period
+        ORDER BY ge.team_id, ge.period
+    """, nativeQuery = true)
+    List<TeamPeriodScoreProjection> findQuarterScores(Long gameId);
+
+    // 선수별 쿼터 득점
+    @Query(value = """
+        SELECT ge.player_id AS playerId,
+               ge.team_id   AS teamId,
+               ge.period    AS period,
+               SUM(COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(ge.meta,'$.pts')) AS SIGNED),0)) AS pts
+        FROM game_events ge
+        WHERE ge.game_id = :gameId
+          AND ge.type = 'SCORE'
+          AND ge.player_id IS NOT NULL
+        GROUP BY ge.player_id, ge.team_id, ge.period
+        ORDER BY ge.team_id, ge.player_id, ge.period
+    """, nativeQuery = true)
+    List<PlayerPeriodScoreProjection> findPlayerQuarterScores(Long gameId);
+
+    // ✅ 리바운드 이벤트 전용 쿼리/Projection 제거됨
 }

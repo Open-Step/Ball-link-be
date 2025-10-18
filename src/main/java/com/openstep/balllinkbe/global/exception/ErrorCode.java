@@ -40,7 +40,11 @@ public enum ErrorCode {
     // Record
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록 정보를 찾을 수 없습니다."),
     RECORD_AGGREGATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "기록 집계 중 오류가 발생했습니다."),
-    RECORD_INVALID_SEASON(HttpStatus.BAD_REQUEST, "유효하지 않은 시즌 값입니다.");
+    RECORD_INVALID_SEASON(HttpStatus.BAD_REQUEST, "유효하지 않은 시즌 값입니다."),
+
+    TOURNAMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "대회를 찾을 수 없습니다."),
+    VENUE_NOT_FOUND(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."),
+    GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "경기를 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
