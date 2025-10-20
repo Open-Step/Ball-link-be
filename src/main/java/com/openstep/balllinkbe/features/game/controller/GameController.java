@@ -5,6 +5,8 @@ import com.openstep.balllinkbe.features.game.dto.request.CreateTournamentGameReq
 import com.openstep.balllinkbe.features.game.dto.request.UpdateGameRequest;
 import com.openstep.balllinkbe.features.game.dto.response.GameCreatedResponse;
 import com.openstep.balllinkbe.features.game.service.GameService;
+import com.openstep.balllinkbe.global.exception.CustomException;
+import com.openstep.balllinkbe.global.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,13 +23,17 @@ public class GameController {
 
     private final GameService gameService;
 
+    /** 대회 경기 생성 (관리자만 가능) */
     @PostMapping("/tournaments/{tournamentId}/games")
-    @Operation(summary = "대회 경기 생성", description = "주최자/관리자가 대회 경기를 생성합니다.")
+    @Operation(summary = "대회 경기 생성", description = "관리자만 대회 경기를 생성할 수 있습니다.")
     public ResponseEntity<GameCreatedResponse> createTournamentGame(
             @PathVariable Long tournamentId,
             @RequestBody CreateTournamentGameRequest req,
             @AuthenticationPrincipal User currentUser
     ) {
+        if (!currentUser.isAdmin()) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
         Long id = gameService.createTournamentGame(tournamentId, req, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(new GameCreatedResponse(id));
     }
