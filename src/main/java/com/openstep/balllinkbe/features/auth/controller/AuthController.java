@@ -55,26 +55,43 @@ public class AuthController {
 
     /** 로그아웃 */
     @PostMapping("/logout")
-    @Operation(summary = "로그아웃", description = "현재 로그인한 사용자의 세션/토큰을 만료 처리합니다.")
-    public ResponseEntity<?> logout(@RequestAttribute("userId") Long userId) {
-        // TODO: refreshToken 무효화 (DB/Redis 저장 시)
-        return ResponseEntity.ok().build();
+    @Operation(summary = "로그아웃", description = "refreshToken 쿠키를 제거합니다.")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        // refreshToken 쿠키 즉시 만료시켜 삭제
+        ResponseCookie deleteCookie = ResponseCookie.from("refreshToken", "")
+                .path("/")
+                .maxAge(0) // 즉시 만료
+                .httpOnly(true)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "로그아웃 되었습니다."));
     }
+
 
     /** 토큰 재발급 */
     @PostMapping("/refresh")
     @Operation(summary = "토큰 재발급", description = "리프레시 토큰을 검증 후 새로운 액세스 토큰을 발급합니다.")
-    public ResponseEntity<AuthResponse> refresh(@RequestParam String refreshToken) {
+    public ResponseEntity<AuthResponse> refresh(@CookieValue(value = "refreshToken") String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            return ResponseEntity.status(401).build(); // RefreshToken 만료/위조
+            return ResponseEntity.status(401).build();
         }
 
         Long userId = jwtTokenProvider.getUserId(refreshToken);
-        String email = authService.findEmailByUserId(userId);
 
-        boolean isAdmin = authService.isAdminByUserId(userId);
+        // 사용자 정보 조회
+        var user = authService.findByUserId(userId);
 
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, email, isAdmin);
+        // 새 accessToken 생성 (이름, 프로필, 관리자 포함)
+        String newAccessToken = jwtTokenProvider.createAccessToken(
+                user.getId(),
+                user.getEmail(),
+                user.isAdmin(),
+                user.getName(),
+                user.getProfileImagePath()
+        );
+
         return ResponseEntity.ok(new AuthResponse(newAccessToken, refreshToken));
     }
 

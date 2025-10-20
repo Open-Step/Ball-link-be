@@ -25,14 +25,16 @@ public class JwtTokenProvider {
     }
 
     /** 액세스 토큰 생성 */
-    public String createAccessToken(Long userId, String email, boolean isAdmin) {
+    public String createAccessToken(Long userId, String email, boolean isAdmin, String name, String profileImagePath) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenValidity);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId)) // userId를 sub에 저장
                 .claim("email", email)
-                .claim("isAdmin", isAdmin) // 추가
+                .claim("name", name)
+                .claim("profileImagePath", profileImagePath)
+                .claim("isAdmin", isAdmin)
                 .setIssuedAt(now)
                 .setExpiration(expiry)
                 .signWith(key, SignatureAlgorithm.HS256)
