@@ -9,6 +9,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @RequiredArgsConstructor
@@ -19,8 +22,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CORS 설정 활성화 (CorsFilter가 동작하도록)
-                .cors(cors -> {})
+                // CORS 설정 활성화 (아래 Bean과 자동 연결됨)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 // CSRF 비활성화 (API 서버니까 필요 없음)
                 .csrf(csrf -> csrf.disable())
@@ -35,16 +38,30 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-                        // 테스트용 정적 리소스 허용
                         .requestMatchers("/", "/index.html", "/css/**", "/js/**", "/images/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll()  // 회원가입, 로그인, 카카오 콜백은 인증 없이 허용
-                        .anyRequest().authenticated()                    // 나머지는 인증 필요
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .anyRequest().authenticated()
                 )
 
                 // JWT 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /** 전역 CORS 설정 */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOrigin("http://localhost:3000");
+        config.setAllowCredentials(true);
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        config.addExposedHeader("Set-Cookie");
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     @Bean
