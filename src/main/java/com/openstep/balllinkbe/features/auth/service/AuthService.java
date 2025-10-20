@@ -6,6 +6,8 @@ import com.openstep.balllinkbe.features.auth.dto.request.LoginRequest;
 import com.openstep.balllinkbe.features.auth.dto.request.SignupRequest;
 import com.openstep.balllinkbe.features.auth.dto.response.AuthResponse;
 import com.openstep.balllinkbe.features.auth.repository.AuthRepository;
+import com.openstep.balllinkbe.global.exception.CustomException;
+import com.openstep.balllinkbe.global.exception.ErrorCode;
 import com.openstep.balllinkbe.global.security.JwtTokenProvider;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -51,13 +53,21 @@ public class AuthService {
     /** 로그인 */
     public AuthResponse login(LoginRequest request) {
         User user = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("가입되지 않은 이메일입니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
         }
 
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.isAdmin());
+        // name, profileImagePath, isAdmin 모두 포함한 JWT 생성
+        String accessToken = jwtTokenProvider.createAccessToken(
+                user.getId(),
+                user.getEmail(),
+                user.isAdmin(),
+                user.getName(),
+                user.getProfileImagePath()
+        );
+
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
         return new AuthResponse(accessToken, refreshToken);
@@ -133,5 +143,10 @@ public class AuthService {
         return authRepository.findById(userId)
                 .map(User::isAdmin)
                 .orElse(false);
+    }
+
+    public User findByUserId(Long userId) {
+        return authRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
 }
