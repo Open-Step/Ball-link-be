@@ -28,6 +28,11 @@ public class User {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // 전역 관리자 여부 (true면 시스템 관리자)
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean isAdmin = false;
+
     public enum Gender { M, F }
 
     /** ID-only 생성자 (FK 매핑용) */

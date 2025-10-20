@@ -7,11 +7,15 @@ import com.openstep.balllinkbe.features.auth.service.AuthService;
 import com.openstep.balllinkbe.global.security.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -32,10 +36,22 @@ public class AuthController {
 
     /** 로그인 */
     @PostMapping("/login")
-    @Operation(summary = "로그인", description = "사용자가 이메일과 비밀번호로 로그인하면 JWT 액세스/리프레시 토큰을 반환합니다.")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    @Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인하면 accessToken을 응답하며, refreshToken은 HttpOnly 쿠키로 발급합니다.")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletResponse response) {
+        AuthResponse tokens = authService.login(request);
+
+        // refreshToken을 HttpOnly 쿠키로 설정
+        ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.getRefreshToken())
+                .httpOnly(true)
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+
+        // accessToken만 JSON 응답으로 반환
+        return ResponseEntity.ok(Map.of("accessToken", tokens.getAccessToken()));
     }
+
 
     /** 로그아웃 */
     @PostMapping("/logout")
@@ -56,7 +72,9 @@ public class AuthController {
         Long userId = jwtTokenProvider.getUserId(refreshToken);
         String email = authService.findEmailByUserId(userId);
 
-        String newAccessToken = jwtTokenProvider.createAccessToken(userId, email);
+        boolean isAdmin = authService.isAdminByUserId(userId);
+
+        String newAccessToken = jwtTokenProvider.createAccessToken(userId, email, isAdmin);
         return ResponseEntity.ok(new AuthResponse(newAccessToken, refreshToken));
     }
 

@@ -57,7 +57,7 @@ public class AuthService {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.isAdmin());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
         return new AuthResponse(accessToken, refreshToken);
@@ -126,5 +126,12 @@ public class AuthService {
         return authRepository.findById(userId)
                 .map(User::getEmail)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+    }
+
+    /** 추가: isAdmin 조회 */
+    public boolean isAdminByUserId(Long userId) {
+        return authRepository.findById(userId)
+                .map(User::isAdmin)
+                .orElse(false);
     }
 }

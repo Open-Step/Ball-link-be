@@ -25,13 +25,14 @@ public class JwtTokenProvider {
     }
 
     /** 액세스 토큰 생성 */
-    public String createAccessToken(Long userId, String email) {
+    public String createAccessToken(Long userId, String email, boolean isAdmin) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenValidity);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId)) // userId를 sub에 저장
                 .claim("email", email)
+                .claim("isAdmin", isAdmin) // 추가
                 .setIssuedAt(now)
                 .setExpiration(expiry)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -59,6 +60,14 @@ public class JwtTokenProvider {
                         .getBody()
                         .getSubject()
         );
+    }
+
+    /** 토큰에서 isAdmin 추출 */
+    public boolean getIsAdmin(String token) {
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("isAdmin", Boolean.class) != null && claims.get("isAdmin", Boolean.class);
     }
 
     /** 토큰 유효성 검증 */
