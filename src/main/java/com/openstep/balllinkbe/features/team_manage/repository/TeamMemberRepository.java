@@ -26,4 +26,6 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     long countByTeamIdAndRoleAndLeftAtIsNull(Long teamId, TeamMember.Role role);
 
     List<TeamMember> findByUserIdAndLeftAtIsNull(Long userId);
+
+    boolean existsByTeamIdAndUserIdAndLeftAtIsNull(Long teamId, Long userId);
 }

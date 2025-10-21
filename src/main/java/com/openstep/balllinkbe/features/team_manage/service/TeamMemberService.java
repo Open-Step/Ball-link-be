@@ -25,7 +25,7 @@ public class TeamMemberService {
     public Page<TeamMemberResponse> getMembers(Long teamId, int page, int size, User currentUser) {
         var members = teamMemberRepository.findByTeamIdAndLeftAtIsNull(teamId);
         List<TeamMemberResponse> responses = members.stream()
-                .map(TeamMemberResponse::new)
+                .map(TeamMemberResponse::from)
                 .toList();
         return new PageImpl<>(responses, PageRequest.of(page, size), responses.size());
     }

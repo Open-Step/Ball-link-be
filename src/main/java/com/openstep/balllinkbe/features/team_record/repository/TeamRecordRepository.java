@@ -87,31 +87,25 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
      *  3) 선수 통산 집계 (랭킹)
      * ─────────────────────────────── */
     @Query("""
-        SELECT 
-            s.player.id          AS playerId,
-            s.player.name        AS playerName,
-            COALESCE(s.player.number, 0) AS backNumber,
-            COUNT(s.id)          AS games,
-            SUM(s.pts)           AS pts,
-            SUM(s.reb)           AS reb,
-            SUM(s.ast)           AS ast,
-            SUM(s.stl)           AS stl,
-            SUM(s.blk)           AS blk,
-            SUM(s.fg2Made)       AS fg2Made,
-            SUM(s.fg2Att)        AS fg2Att,
-            SUM(s.fg3Made)       AS fg3Made,
-            SUM(s.fg3Att)        AS fg3Att,
-            SUM(s.ftMade)        AS ftMade,
-            SUM(s.ftAtt)         AS ftAtt
-        FROM GamePlayerStat s
-        JOIN s.game g
-        LEFT JOIN g.tournament t
-        WHERE s.team.id = :teamId
-          AND (:season = 'ALL' OR t.season = :season)
-        GROUP BY s.player.id, s.player.name, s.player.number
-    """)
-    List<PlayerAggregateProjection> aggregatePlayerStats(@Param("teamId") Long teamId,
-                                                         @Param("season") String season);
+    SELECT 
+        s.player.id AS playerId,
+        s.player.name AS playerName,
+        COALESCE(s.player.number, 0) AS backNumber,
+        COUNT(s.id) AS games,
+        SUM(s.pts) AS pts,
+        SUM(s.reb) AS reb,
+        SUM(s.ast) AS ast,
+        SUM(s.stl) AS stl,
+        SUM(s.blk) AS blk,
+        SUM(s.fg2Made) AS fg2,
+        SUM(s.fg3Made) AS fg3,
+        SUM(s.ftMade) AS ft
+    FROM GamePlayerStat s
+    WHERE s.team.id = :teamId
+    GROUP BY s.player.id, s.player.name, s.player.number
+""")
+    List<PlayerAggregateProjection> aggregatePlayerStats(@Param("teamId") Long teamId);
+
 
     /* ───────────────────────────────
      *  4) 선수 경기별 기록 (페이징)
@@ -138,31 +132,46 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
                                                Pageable pageable);
 
     /* ───────────────────────────────
-     *  5) 팀 대회목록 요약
+     *  5) 팀 대회목록 요약 (완전 버전)
      * ─────────────────────────────── */
     @Query(value = """
-        SELECT 
-            t.id                AS tournamentId,
-            t.name              AS tournamentName,
-            t.season            AS season,
-            t.status            AS status,
-            t.start_date        AS startDate,
-            t.end_date          AS endDate,
-            COUNT(DISTINCT g.id)                                            AS games,
-            SUM(CASE WHEN s.pts > opp.pts THEN 1 ELSE 0 END)               AS wins,
-            SUM(CASE WHEN s.pts < opp.pts THEN 1 ELSE 0 END)               AS losses,
-            SUM(s.pts)                                                     AS pts
-        FROM game_team_stats s
-        JOIN games g ON g.id = s.game_id
-        JOIN tournaments t ON t.id = g.tournament_id
-        JOIN game_team_stats opp ON opp.game_id = g.id AND opp.team_id <> s.team_id
-        WHERE s.team_id = :teamId
-          AND (:season = 'ALL' OR t.season = :season)
-        GROUP BY t.id, t.name, t.season, t.status, t.start_date, t.end_date
-        ORDER BY t.start_date DESC
-    """, nativeQuery = true)
-    List<TournamentAggProjection> findTournamentSummaries(@Param("teamId") Long teamId,
-                                                          @Param("season") String season);
+
+            SELECT\s
+    t.id                AS tournamentId,
+    t.name              AS tournamentName,
+    t.season            AS season,
+    t.status            AS status,
+    t.start_date        AS startDate,
+    t.end_date          AS endDate,
+    COUNT(DISTINCT g.id) AS games,
+    SUM(CASE WHEN s.pts > opp.pts THEN 1 ELSE 0 END) AS wins,
+    SUM(CASE WHEN s.pts < opp.pts THEN 1 ELSE 0 END) AS losses,
+
+    /* ─ 스탯 합산 ─ */
+    SUM(s.pts)  AS pts,
+    SUM(s.reb)  AS reb,
+    SUM(s.ast)  AS ast,
+    SUM(s.stl)  AS stl,
+    SUM(s.blk)  AS blk,
+    SUM(s.fg2)  AS fg2,
+    SUM(s.fg3)  AS fg3,
+    SUM(s.ft)   AS ft
+
+FROM game_team_stats s
+JOIN games g ON g.id = s.game_id
+JOIN tournaments t ON t.id = g.tournament_id
+JOIN game_team_stats opp ON opp.game_id = g.id AND opp.team_id <> s.team_id
+WHERE s.team_id = :teamId
+  AND (:season = 'ALL' OR t.season = :season)
+GROUP BY t.id, t.name, t.season, t.status, t.start_date, t.end_date
+ORDER BY t.start_date DESC
+
+""", nativeQuery = true)
+    List<TournamentAggProjection> findTournamentSummaries(
+            @Param("teamId") Long teamId,
+            @Param("season") String season
+    );
+
 
     /* ───────────────────────────────
      *  6) 대회 내 경기목록 (팀 관점, Page)
@@ -204,6 +213,30 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
                                                        @Param("tournamentId") Long tournamentId,
                                                        @Param("status") String status,
                                                        Pageable pageable);
+    /* ───────────────────────────────
+     *  6) 팀 시즌별 통산기록 요약 (연도별)
+     * ─────────────────────────────── */
+    @Query(value = """
+    SELECT 
+        t.season               AS season,
+        COUNT(DISTINCT g.id)   AS games,
+        SUM(s.pts)             AS pts,
+        SUM(s.reb)             AS reb,
+        SUM(s.ast)             AS ast,
+        SUM(s.stl)             AS stl,
+        SUM(s.blk)             AS blk,
+        SUM(s.fg2)             AS fg2,
+        SUM(s.fg3)             AS fg3,
+        SUM(s.ft)              AS ft
+    FROM game_team_stats s
+    JOIN games g ON g.id = s.game_id
+    JOIN tournaments t ON t.id = g.tournament_id
+    WHERE s.team_id = :teamId
+    GROUP BY t.season
+    ORDER BY t.season DESC
+""", nativeQuery = true)
+    List<SeasonAggProjection> findSeasonSummaries(@Param("teamId") Long teamId);
+
 
     /* ───────────────────────────────
      *  7) 경기 박스스코어 (헤더/팀합계/선수라인) + 쿼터 득점
@@ -282,5 +315,4 @@ public interface TeamRecordRepository extends JpaRepository<GameTeamStat, Long> 
     """, nativeQuery = true)
     List<PlayerPeriodScoreProjection> findPlayerQuarterScores(Long gameId);
 
-    // ✅ 리바운드 이벤트 전용 쿼리/Projection 제거됨
 }

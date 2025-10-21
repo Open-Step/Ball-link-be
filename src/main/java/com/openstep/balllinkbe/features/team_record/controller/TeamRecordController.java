@@ -3,6 +3,9 @@ package com.openstep.balllinkbe.features.team_record.controller;
 import com.openstep.balllinkbe.features.team_record.dto.response.*;
 import com.openstep.balllinkbe.features.team_record.service.TeamRecordService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,27 +31,23 @@ public class TeamRecordController {
         return ResponseEntity.ok(teamRecordService.getTournamentRecord(tournamentId, teamId, aggregate));
     }
 
-    /** 2) 팀 통산기록 (시즌/전체) */
+    /** 2) 팀 통산기록 (연도별 요약) */
     @GetMapping("/teams/{teamId}/records")
-    @Operation(summary = "팀 통산기록(시즌/전체)", description = "팀 전체 혹은 특정 시즌의 누적 및 경기당 통계를 조회합니다.")
+    @Operation(summary = "팀 통산기록(연도별)", description = "팀의 연도별 누적 및 경기당 통계를 조회합니다.")
     public ResponseEntity<TeamSeasonRecordResponse> getTeamSeasonRecord(
-            @PathVariable Long teamId,
-            @RequestParam(defaultValue = "ALL") String season,
-            @RequestParam(defaultValue = "BOTH") String split
+            @PathVariable Long teamId
     ) {
-        return ResponseEntity.ok(teamRecordService.getSeasonRecord(teamId, season, split));
+        return ResponseEntity.ok(teamRecordService.getSeasonRecord(teamId));
     }
 
-    /** 3) 선수 통산기록 (팀단위, 랭킹) */
+
+    /** 3) 선수 통산기록 (팀단위) */
     @GetMapping("/teams/{teamId}/players/stats")
-    @Operation(summary = "선수 통산기록(팀단위)", description = "팀 소속 선수들의 합계/평균/랭킹을 조회합니다.")
-    public ResponseEntity<PlayerStatsResponse> getPlayerStats(
-            @PathVariable Long teamId,
-            @RequestParam(defaultValue = "ALL") String season,
-            @RequestParam(defaultValue = "pts") String rankBy
-    ) {
-        return ResponseEntity.ok(teamRecordService.getPlayerStats(teamId, season, rankBy));
+    @Operation(summary = "선수 통산기록(팀단위)", description = "팀 소속 선수들의 누적 통산기록을 조회합니다.")
+    public ResponseEntity<PlayerStatsResponse> getPlayerStats(@PathVariable Long teamId) {
+        return ResponseEntity.ok(teamRecordService.getPlayerStats(teamId));
     }
+
 
     /** 4) 선수 경기별 기록 (페이징) */
     @GetMapping("/teams/{teamId}/players/{playerId}/games")
@@ -66,13 +65,21 @@ public class TeamRecordController {
 
     /** 5) 팀 대회목록 (참여 요약) */
     @GetMapping("/teams/{teamId}/tournaments/participations")
-    @Operation(summary = "팀 대회목록 조회", description = "팀이 참가한 대회 목록과 요약 통계를 조회합니다.")
+    @Operation(summary = "팀 대회목록 조회", description = "팀이 참가한 대회 목록과 각 대회의 누적 통계를 조회합니다.",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "OK",
+                            content = @Content(schema = @Schema(implementation = TournamentSummaryResponse.class))
+                    )
+            })
     public ResponseEntity<TournamentSummaryResponse> getTeamTournaments(
             @PathVariable Long teamId,
             @RequestParam(defaultValue = "ALL") String season
     ) {
         return ResponseEntity.ok(teamRecordService.getTeamTournaments(teamId, season));
     }
+
 
     /** 6) 대회 내 팀 경기목록 (페이징) */
     @GetMapping("/teams/{teamId}/tournaments/{tournamentId}/games")

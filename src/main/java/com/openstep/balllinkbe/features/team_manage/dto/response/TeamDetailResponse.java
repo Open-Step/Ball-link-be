@@ -19,12 +19,14 @@ public class TeamDetailResponse {
     private final String ownerName;
     private final String ownerProfileUrl;
     private final boolean isOwner;
+    private final boolean isIncluded;
     private final long playerCount;
 
     public TeamDetailResponse(Team team,
                               long playerCount,
-                              String cdnUrl,
+                              String emblemUrl,
                               boolean isOwner,
+                              boolean isIncluded,
                               String ownerProfileUrl) {
         this.id = team.getId();
         this.name = team.getName();
@@ -34,10 +36,11 @@ public class TeamDetailResponse {
         this.description = team.getDescription();
         this.foundedAt = team.getFoundedAt();
         this.isPublic = team.getIsPublic();
-        this.emblemUrl = cdnUrl;
+        this.emblemUrl = emblemUrl;
         this.ownerName = team.getOwnerUser() != null ? team.getOwnerUser().getName() : null;
         this.ownerProfileUrl = ownerProfileUrl;
         this.isOwner = isOwner;
+        this.isIncluded = isIncluded;
         this.playerCount = playerCount;
     }
 }

@@ -2,7 +2,8 @@ package com.openstep.balllinkbe.features.game.repository;
 
 import com.openstep.balllinkbe.domain.game.Game;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import java.util.List;
 
-@Repository
-public interface GameRepository extends JpaRepository<Game, Long> { }
+public interface GameRepository extends JpaRepository<Game, Long> {
+    List<Game> findByTournamentIdOrderByScheduledAtAsc(Long tournamentId);
+}

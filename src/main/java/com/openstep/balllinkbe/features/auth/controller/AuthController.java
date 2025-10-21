@@ -1,7 +1,6 @@
 package com.openstep.balllinkbe.features.auth.controller;
 
-import com.openstep.balllinkbe.features.auth.dto.request.LoginRequest;
-import com.openstep.balllinkbe.features.auth.dto.request.SignupRequest;
+import com.openstep.balllinkbe.features.auth.dto.request.*;
 import com.openstep.balllinkbe.features.auth.dto.response.AuthResponse;
 import com.openstep.balllinkbe.features.auth.service.AuthService;
 import com.openstep.balllinkbe.global.security.JwtTokenProvider;
@@ -111,19 +110,38 @@ public class AuthController {
     /** 비밀번호 재설정 요청 */
     @PostMapping("/password-reset")
     @Operation(summary = "비밀번호 재설정 요청", description = "사용자 이메일을 입력받아 비밀번호 재설정 토큰을 발급하고, 이메일로 발송합니다.")
-    public ResponseEntity<?> requestPasswordReset(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
-        String token = authService.requestPasswordReset(email);
+    public ResponseEntity<?> requestPasswordReset(@RequestBody PasswordResetRequest request) {
+        String token = authService.requestPasswordReset(request.getEmail());
         return ResponseEntity.accepted().body(Map.of("success", true, "token", token));
     }
 
     /** 비밀번호 재설정 확인 */
     @PostMapping("/password-reset/confirm")
     @Operation(summary = "비밀번호 재설정 확인", description = "발급된 토큰과 새 비밀번호를 입력받아 비밀번호를 실제로 변경합니다.")
-    public ResponseEntity<?> confirmPasswordReset(@RequestBody Map<String, String> body) {
-        String token = body.get("token");
-        String newPassword = body.get("newPassword");
-        authService.confirmPasswordReset(token, newPassword);
+    public ResponseEntity<?> confirmPasswordReset(@RequestBody PasswordResetConfirmRequest request) {
+        authService.confirmPasswordReset(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok(Map.of("success", true));
     }
+
+
+    /** 비밀번호 변경 */
+    @PostMapping("/password-change")
+    @Operation(summary = "비밀번호 변경", description = "로그인된 사용자가 기존 비밀번호를 검증하고 새 비밀번호로 변경합니다.")
+    public ResponseEntity<?> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @RequestHeader("Authorization") String authorization) {
+
+        String oldPassword = request.getOldPassword();
+        String newPassword = request.getNewPassword();
+
+        // 액세스 토큰에서 사용자 ID 추출
+        String token = authorization.replace("Bearer ", "");
+        Long userId = jwtTokenProvider.getUserId(token);
+
+        authService.changePassword(userId, oldPassword, newPassword);
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "비밀번호가 성공적으로 변경되었습니다."));
+    }
+
+
 }

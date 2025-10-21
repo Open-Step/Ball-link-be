@@ -23,6 +23,7 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -45,16 +46,15 @@ public class TeamService {
                 .limit(3)
                 .map(team -> new TeamSummaryResponse(
                         team,
-                        toCdnUrl(team.getEmblemUrl()),
-                        team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId()) // ✅ isOwner
+                        team.getEmblemUrl(), // 상대경로 그대로
+                        team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId())
                 ))
                 .toList();
     }
 
-
     /** 팀 생성 */
     @Transactional
-    public Long createTeam(CreateTeamRequest dto, User currentUser) {
+    public Long createTeam(CreateTeamRequest dto, MultipartFile file, User currentUser) {
         User owner = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -68,9 +68,24 @@ public class TeamService {
         team.setOwnerUser(owner);
         team.setCreatedAt(LocalDateTime.now());
 
-        String tag = generateUniqueTeamTag(dto.getName());
-        team.setTeamTag(tag);
+        // 엠블럼 업로드
+        if (file != null && !file.isEmpty()) {
+            FileValidator.validateImageFile(file);
+            try {
+                String relativePath = fileStorageService.storeFile(
+                        null,
+                        FileMeta.OwnerType.TEAM,
+                        FileMeta.FileCategory.EMBLEM,
+                        file.getOriginalFilename(),
+                        file.getBytes()
+                );
+                team.setEmblemUrl(relativePath);
+            } catch (IOException e) {
+                throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
+            }
+        }
 
+        team.setTeamTag(generateUniqueTeamTag(dto.getName()));
         Team saved = teamRepository.save(team);
 
         TeamMember member = new TeamMember();
@@ -108,7 +123,8 @@ public class TeamService {
         team.setUpdatedAt(LocalDateTime.now());
         Team updated = teamRepository.save(team);
 
-        return new TeamResponse(updated, toCdnUrl(updated.getEmblemUrl()));
+        // 상대경로 그대로 반환
+        return new TeamResponse(updated, updated.getEmblemUrl());
     }
 
     /** 팀 목록 조회 */
@@ -121,8 +137,8 @@ public class TeamService {
         return teams.map(team ->
                 new TeamSummaryResponse(
                         team,
-                        toCdnUrl(team.getEmblemUrl()),
-                        false // 공개 팀 목록에서는 오너 여부 계산 불필요, 항상 false로
+                        team.getEmblemUrl(), // 상대경로 그대로
+                        false
                 )
         );
     }
@@ -134,14 +150,34 @@ public class TeamService {
 
         long playerCount = playerRepository.countByTeamIdAndIsActiveTrue(teamId);
 
-        boolean isOwner = currentUser != null && team.getOwnerUser() != null &&
-                team.getOwnerUser().getId().equals(currentUser.getId());
+        boolean isOwner = false;
+        boolean isIncluded = false;
+
+        // 로그인 사용자만 소속/팀장 여부 계산
+        if (currentUser != null) {
+            Long userId = currentUser.getId();
+
+            if (team.getOwnerUser() != null && team.getOwnerUser().getId().equals(userId)) {
+                isOwner = true;
+            }
+
+            // 소속 여부
+            isIncluded = teamMemberRepository.existsByTeamIdAndUserIdAndLeftAtIsNull(teamId, userId);
+        }
 
         String ownerProfileUrl = team.getOwnerUser() != null
-                ? toCdnUrl(team.getOwnerUser().getProfileImagePath())
+                ? team.getOwnerUser().getProfileImagePath()
                 : null;
 
-        return new TeamDetailResponse(team, playerCount, toCdnUrl(team.getEmblemUrl()), isOwner, ownerProfileUrl);
+        // isIncluded 전달 가능한 오버로딩 생성자 사용
+        return new TeamDetailResponse(
+                team,
+                playerCount,
+                team.getEmblemUrl(), // 상대경로 그대로
+                isOwner,
+                isIncluded,
+                ownerProfileUrl
+        );
     }
 
 
@@ -218,14 +254,9 @@ public class TeamService {
             team.setUpdatedAt(LocalDateTime.now());
             teamRepository.save(team);
 
-            return fileStorageService.toCdnUrl(relativePath);
-        } catch (Exception e) {
+            return relativePath; // 절대경로 변환 안 함
+        } catch (IOException e) {
             throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
         }
-    }
-
-    /** 공통 CDN URL 변환 */
-    private String toCdnUrl(String relativePath) {
-        return relativePath != null ? fileStorageService.toCdnUrl(relativePath) : null;
     }
 }
