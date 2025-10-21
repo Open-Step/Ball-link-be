@@ -70,11 +70,13 @@ public class TeamController {
         return ResponseEntity.ok(teamService.getTeams(page, size, sort, q));
     }
 
-    @GetMapping("/{teamId}")
     @Operation(summary = "팀 상세 조회")
-    public ResponseEntity<TeamDetailResponse> getTeamDetail(@PathVariable Long teamId) {
-        return ResponseEntity.ok(teamService.getTeamDetail(teamId));
+    @GetMapping("/{teamId}")
+    public ResponseEntity<TeamDetailResponse> getTeamDetail(@PathVariable Long teamId,
+                                                            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(teamService.getTeamDetail(teamId, currentUser));
     }
+
 
     @DeleteMapping("/{teamId}")
     @Operation(summary = "팀 해산 (soft delete, 팀장만 가능)")

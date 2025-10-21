@@ -15,11 +15,17 @@ public class TeamDetailResponse {
     private final String description;
     private final LocalDate foundedAt;
     private final Boolean isPublic;
-    private final String emblemUrl; // CDN 붙은 URL
+    private final String emblemUrl;
     private final String ownerName;
+    private final String ownerProfileUrl;
+    private final boolean isOwner;
     private final long playerCount;
 
-    public TeamDetailResponse(Team team, long playerCount, String cdnUrl) {
+    public TeamDetailResponse(Team team,
+                              long playerCount,
+                              String cdnUrl,
+                              boolean isOwner,
+                              String ownerProfileUrl) {
         this.id = team.getId();
         this.name = team.getName();
         this.teamTag = team.getTeamTag();
@@ -28,8 +34,10 @@ public class TeamDetailResponse {
         this.description = team.getDescription();
         this.foundedAt = team.getFoundedAt();
         this.isPublic = team.getIsPublic();
-        this.emblemUrl = cdnUrl; // CDN URL 적용
+        this.emblemUrl = cdnUrl;
         this.ownerName = team.getOwnerUser() != null ? team.getOwnerUser().getName() : null;
+        this.ownerProfileUrl = ownerProfileUrl;
+        this.isOwner = isOwner;
         this.playerCount = playerCount;
     }
 }
