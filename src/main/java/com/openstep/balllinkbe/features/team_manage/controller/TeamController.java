@@ -36,13 +36,16 @@ public class TeamController {
         return ResponseEntity.ok(teamService.getMyTeams(currentUser));
     }
 
-    @PostMapping
-    @Operation(summary = "팀 생성")
-    public ResponseEntity<?> createTeam(@Valid @RequestBody CreateTeamRequest request,
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "팀 생성 (엠블럼 포함)")
+    public ResponseEntity<?> createTeam(@Valid @RequestPart("data") CreateTeamRequest request,
+                                        @RequestPart(value = "file", required = false) MultipartFile file,
                                         @AuthenticationPrincipal User currentUser) {
-        Long teamId = teamService.createTeam(request, currentUser);
+        Long teamId = teamService.createTeam(request, file, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", teamId));
     }
+
+
 
     @PatchMapping("/{teamId}")
     @Operation(summary = "팀 수정 (팀장만 가능)")

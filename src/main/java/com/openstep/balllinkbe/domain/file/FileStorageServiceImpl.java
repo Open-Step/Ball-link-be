@@ -81,7 +81,8 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String toCdnUrl(String relativePath) {
-        return cdnBaseUrl + "/" + relativePath;
+        // 절대경로 변환 안 함. 그대로 반환
+        return relativePath;
     }
 
     private String detectContentType(String ext) {
