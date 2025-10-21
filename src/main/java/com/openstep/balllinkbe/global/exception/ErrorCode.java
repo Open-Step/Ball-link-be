@@ -13,6 +13,8 @@ public enum ErrorCode {
     UNAUTHORIZED_MEMBER(HttpStatus.FORBIDDEN, "팀 권한이 없습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."), // 관리자 권한 부족 등 공통 사용
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "기존 비밀번호가 일치하지 않습니다."),
+    SAME_PASSWORD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "기존 비밀번호와 새 비밀번호가 동일할 수 없습니다."),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),

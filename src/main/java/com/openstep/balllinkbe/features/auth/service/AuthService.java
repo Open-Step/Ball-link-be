@@ -149,4 +149,23 @@ public class AuthService {
         return authRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
     }
+
+    @Transactional
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        var user = authRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        if (oldPassword.equals(newPassword)) {
+            throw new CustomException(ErrorCode.SAME_PASSWORD_NOT_ALLOWED);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        authRepository.save(user);
+    }
+
+
 }
