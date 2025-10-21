@@ -1,37 +1,57 @@
 package com.openstep.balllinkbe.features.team_record.dto.response;
 
-import com.openstep.balllinkbe.features.team_record.repository.projection.TournamentAggProjection;
-import lombok.*;
-
-import java.time.LocalDate;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
 import java.util.List;
 
-@Getter @Setter @AllArgsConstructor @NoArgsConstructor
+@Getter
+@AllArgsConstructor
+@Schema(description = "팀의 대회별 누적 기록 리스트 응답")
 public class TournamentSummaryResponse {
-    private List<Item> items;
 
-    @Getter @Setter @AllArgsConstructor @NoArgsConstructor @Builder
+    private final List<Item> items;
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    @Schema(description = "대회별 요약 통계 정보")
     public static class Item {
         private Long tournamentId;
         private String tournamentName;
-        private String season;
-        private String status;
-        private LocalDate startDate;
-        private LocalDate endDate;
-        private int games, wins, losses, pts;
+        private int games;
+        private int wins;
+        private int losses;
+        private Stats totals;
+        private StatsAvg perGame;
     }
 
-    public static TournamentSummaryResponse from(List<TournamentAggProjection> rows) {
-        List<Item> items = rows.stream().map(r -> Item.builder()
-                .tournamentId(r.getTournamentId())
-                .tournamentName(r.getTournamentName())
-                .season(r.getSeason())
-                .status(r.getStatus())
-                .startDate(r.getStartDate() != null ? r.getStartDate().toLocalDate() : null)
-                .endDate(r.getEndDate() != null ? r.getEndDate().toLocalDate() : null)
-                .games(nz(r.getGames())).wins(nz(r.getWins())).losses(nz(r.getLosses())).pts(nz(r.getPts()))
-                .build()).toList();
-        return new TournamentSummaryResponse(items);
+    @Getter
+    @AllArgsConstructor
+    @Schema(description = "누적 스탯")
+    public static class Stats {
+        private int pts;
+        private int reb;
+        private int ast;
+        private int stl;
+        private int blk;
+        private int fg2;
+        private int fg3;
+        private int ft;
     }
-    private static int nz(Integer v) { return v == null ? 0 : v; }
+
+    @Getter
+    @AllArgsConstructor
+    @Schema(description = "경기당 평균 스탯")
+    public static class StatsAvg {
+        private double pts;
+        private double reb;
+        private double ast;
+        private double stl;
+        private double blk;
+        private double fg2;
+        private double fg3;
+        private double ft;
+    }
 }

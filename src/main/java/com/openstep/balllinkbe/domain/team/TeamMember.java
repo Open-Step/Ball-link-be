@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
         uniqueConstraints = @UniqueConstraint(name = "uk_team_user", columnNames = {"team_id","user_id"}))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TeamMember {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -21,6 +22,18 @@ public class TeamMember {
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    /** ✅ 등번호 (nullable 허용, 팀별 등록번호) */
+    @Column(name = "back_number")
+    private Integer backNumber;
+
+    /** 포지션 (예: G, F, C 등) */
+    @Column(length = 10)
+    private String position;
+
+    /** 주요 활동 지역 */
+    @Column(length = 100)
+    private String location;
 
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;

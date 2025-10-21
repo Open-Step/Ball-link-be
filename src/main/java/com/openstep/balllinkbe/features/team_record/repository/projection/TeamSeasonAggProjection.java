@@ -1,11 +1,8 @@
 package com.openstep.balllinkbe.features.team_record.repository.projection;
 
-public interface TournamentAggProjection {
-    Long getTournamentId();
-    String getTournamentName();
+public interface TeamSeasonAggProjection {
+    String getSeason();
     int getGames();
-    int getWins();
-    int getLosses();
     int getPts();
     int getReb();
     int getAst();

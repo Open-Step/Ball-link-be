@@ -46,8 +46,17 @@ public enum ErrorCode {
     RECORD_AGGREGATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "기록 집계 중 오류가 발생했습니다."),
     RECORD_INVALID_SEASON(HttpStatus.BAD_REQUEST, "유효하지 않은 시즌 값입니다."),
 
+    // Tournament
     TOURNAMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "대회를 찾을 수 없습니다."),
+    DUPLICATE_TOURNAMENT_NAME(HttpStatus.CONFLICT, "이미 존재하는 대회 이름입니다."),
+    INVALID_TOURNAMENT_DATE(HttpStatus.BAD_REQUEST, "대회 시작일이 종료일보다 늦을 수 없습니다."),
+    TOURNAMENT_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 종료된 대회입니다."),
+    TOURNAMENT_IN_PROGRESS(HttpStatus.CONFLICT, "진행 중인 대회는 수정할 수 없습니다."),
+
+    // Venue
     VENUE_NOT_FOUND(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."),
+
+    // Game
     GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "경기를 찾을 수 없습니다.");
 
     private final HttpStatus status;

@@ -5,6 +5,7 @@ import com.openstep.balllinkbe.features.team_record.dto.response.*;
 import com.openstep.balllinkbe.features.team_record.repository.TeamRecordRepository;
 import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerAggregateProjection;
 import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerGameProjection;
+import com.openstep.balllinkbe.features.team_record.repository.projection.SeasonAggProjection;
 import com.openstep.balllinkbe.features.team_record.repository.projection.TournamentAggProjection;
 import com.openstep.balllinkbe.global.exception.CustomException;
 import com.openstep.balllinkbe.global.exception.ErrorCode;
@@ -64,56 +65,49 @@ public class TeamRecordService {
                 .build();
     }
 
-    /** 2) 팀 통산기록 (시즌/전체) */
-    public TeamSeasonRecordResponse getSeasonRecord(Long teamId, String season, String split) {
-        List<GameTeamStat> stats = teamRecordRepository.findByTeamIdAndSeason(teamId, season);
-        if (stats.isEmpty()) throw new CustomException(ErrorCode.RECORD_NOT_FOUND);
-
-        int games = stats.size();
-        int pts = stats.stream().mapToInt(GameTeamStat::getPts).sum();
-        int reb = stats.stream().mapToInt(GameTeamStat::getReb).sum();
-        int ast = stats.stream().mapToInt(GameTeamStat::getAst).sum();
-        int stl = stats.stream().mapToInt(GameTeamStat::getStl).sum();
-        int blk = stats.stream().mapToInt(GameTeamStat::getBlk).sum();
-
-        Integer wins = teamRecordRepository.countWinsInSeason(teamId, season);
-        Integer losses = teamRecordRepository.countLossesInSeason(teamId, season);
-        int w = wins == null ? 0 : wins;
-        int l = losses == null ? 0 : losses;
-
-        var totals = new TeamSeasonRecordResponse.Stats(pts, reb, ast, stl, blk);
-        var perGame = new TeamSeasonRecordResponse.StatsAvg(
-                avg(pts, games), avg(reb, games), avg(ast, games), avg(stl, games), avg(blk, games)
-        );
-
-        return TeamSeasonRecordResponse.builder()
-                .teamId(teamId)
-                .season(season)
-                .games(games)
-                .wins(w)
-                .losses(l)
-                .totals(totals)
-                .perGame(perGame)
-                .build();
-    }
-
-    /** 3) 선수 통산기록 (팀단위) */
-    public PlayerStatsResponse getPlayerStats(Long teamId, String season, String rankBy) {
-        List<PlayerAggregateProjection> rows = teamRecordRepository.aggregatePlayerStats(teamId, season);
+    /** 2) 팀 통산기록 (연도별) *//** 팀 통산기록 (연도별) */
+    public TeamSeasonRecordResponse getSeasonRecord(Long teamId) {
+        List<SeasonAggProjection> rows = teamRecordRepository.findSeasonSummaries(teamId);
         if (rows.isEmpty()) throw new CustomException(ErrorCode.RECORD_NOT_FOUND);
 
-        // 정렬 (rankBy)
-        Comparator<PlayerAggregateProjection> cmp = switch (rankBy.toLowerCase()) {
-            case "reb" -> Comparator.comparingInt(PlayerAggregateProjection::getReb);
-            case "ast" -> Comparator.comparingInt(PlayerAggregateProjection::getAst);
-            case "stl" -> Comparator.comparingInt(PlayerAggregateProjection::getStl);
-            case "blk" -> Comparator.comparingInt(PlayerAggregateProjection::getBlk);
-            default -> Comparator.comparingInt(PlayerAggregateProjection::getPts);
-        };
-        rows = rows.stream().sorted(cmp.reversed()).toList();
+        var items = rows.stream().map(r -> TeamSeasonRecordResponse.Item.builder()
+                .season(r.getSeason())
+                .games(r.getGames())
+                .totals(new TeamSeasonRecordResponse.Stats(
+                        r.getPts(), r.getReb(), r.getAst(), r.getStl(), r.getBlk(),
+                        r.getFg2(), r.getFg3(), r.getFt()
+                ))
+                .perGame(new TeamSeasonRecordResponse.StatsAvg(
+                        avg(r.getPts(), r.getGames()),
+                        avg(r.getReb(), r.getGames()),
+                        avg(r.getAst(), r.getGames()),
+                        avg(r.getStl(), r.getGames()),
+                        avg(r.getBlk(), r.getGames()),
+                        avg(r.getFg2(), r.getGames()),
+                        avg(r.getFg3(), r.getGames()),
+                        avg(r.getFt(), r.getGames())
+                ))
+                .build()).toList();
 
-        return PlayerStatsResponse.fromAggregates(rows, rankBy);
+        return new TeamSeasonRecordResponse(items);
     }
+
+
+
+
+    /** 3) 선수 통산기록 (팀단위) */
+    public PlayerStatsResponse getPlayerStats(Long teamId) {
+        List<PlayerAggregateProjection> rows = teamRecordRepository.aggregatePlayerStats(teamId);
+        if (rows.isEmpty()) throw new CustomException(ErrorCode.RECORD_NOT_FOUND);
+
+        // 기본 정렬: 득점 순
+        rows = rows.stream()
+                .sorted(Comparator.comparingInt(PlayerAggregateProjection::getPts).reversed())
+                .toList();
+
+        return PlayerStatsResponse.fromAggregates(rows, "pts");
+    }
+
 
     /** 4) 선수 경기별 기록 (페이징) */
     public Page<PlayerGameRecordResponse.Item> getPlayerGameRecords(Long teamId, Long playerId, String season, int page, int size, String sort) {
@@ -122,12 +116,37 @@ public class TeamRecordService {
         return pageData.map(PlayerGameRecordResponse.Item::from);
     }
 
-    /** 5) 팀 대회목록 (참여 요약) */
+    /** 5) 팀 대회별 누적기록 */
     public TournamentSummaryResponse getTeamTournaments(Long teamId, String season) {
         List<TournamentAggProjection> rows = teamRecordRepository.findTournamentSummaries(teamId, season);
-        if (rows.isEmpty()) return new TournamentSummaryResponse(List.of());
-        return TournamentSummaryResponse.from(rows);
+        if (rows.isEmpty()) throw new CustomException(ErrorCode.RECORD_NOT_FOUND);
+
+        var items = rows.stream().map(r -> TournamentSummaryResponse.Item.builder()
+                .tournamentId(r.getTournamentId())
+                .tournamentName(r.getTournamentName())
+                .games(r.getGames())
+                .wins(r.getWins())
+                .losses(r.getLosses())
+                .totals(new TournamentSummaryResponse.Stats(
+                        r.getPts(), r.getReb(), r.getAst(), r.getStl(), r.getBlk(),
+                        r.getFg2(), r.getFg3(), r.getFt()
+                ))
+                .perGame(new TournamentSummaryResponse.StatsAvg(
+                        avg(r.getPts(), r.getGames()),
+                        avg(r.getReb(), r.getGames()),
+                        avg(r.getAst(), r.getGames()),
+                        avg(r.getStl(), r.getGames()),
+                        avg(r.getBlk(), r.getGames()),
+                        avg(r.getFg2(), r.getGames()),
+                        avg(r.getFg3(), r.getGames()),
+                        avg(r.getFt(), r.getGames())
+                ))
+                .build()).toList();
+
+        return new TournamentSummaryResponse(items);
     }
+
+
 
     /** 6) 대회 내 경기목록 */
     public Page<TournamentGameListResponse.Item> getTournamentGames(Long teamId, Long tournamentId, String status,
