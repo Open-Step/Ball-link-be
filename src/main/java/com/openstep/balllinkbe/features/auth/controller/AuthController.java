@@ -73,17 +73,18 @@ public class AuthController {
     /** 토큰 재발급 */
     @PostMapping("/refresh")
     @Operation(summary = "토큰 재발급", description = "리프레시 토큰을 검증 후 새로운 액세스 토큰을 발급합니다.")
-    public ResponseEntity<AuthResponse> refresh(@CookieValue(value = "refreshToken") String refreshToken) {
+    public ResponseEntity<Map<String, String>> refresh(
+            @CookieValue(value = "refreshToken") String refreshToken,
+            HttpServletResponse response) {
+
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             return ResponseEntity.status(401).build();
         }
 
         Long userId = jwtTokenProvider.getUserId(refreshToken);
-
-        // 사용자 정보 조회
         var user = authService.findByUserId(userId);
 
-        // 새 accessToken 생성 (이름, 프로필, 관리자 포함)
+        // 새로운 accessToken 생성
         String newAccessToken = jwtTokenProvider.createAccessToken(
                 user.getId(),
                 user.getEmail(),
@@ -92,8 +93,20 @@ public class AuthController {
                 user.getProfileImagePath()
         );
 
-        return ResponseEntity.ok(new AuthResponse(newAccessToken, refreshToken));
+        // refreshToken은 그대로 유지하되, 다시 쿠키로 세팅
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(true) // HTTPS 환경용 (로컬테스트 시 false로 변경 가능)
+                .sameSite("None")
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        // body에는 accessToken만 반환
+        return ResponseEntity.ok(Map.of("accessToken", newAccessToken));
     }
+
 
     /** 비밀번호 재설정 요청 */
     @PostMapping("/password-reset")
