@@ -1,5 +1,6 @@
 package com.openstep.balllinkbe.features.user.controller;
 
+import com.openstep.balllinkbe.domain.file.FileValidator;
 import com.openstep.balllinkbe.features.user.dto.request.UpdateEmailRequest;
 import com.openstep.balllinkbe.features.user.dto.response.ProfileImageResponse;
 import com.openstep.balllinkbe.features.user.dto.response.UserResponse;
@@ -39,6 +40,8 @@ public class UserController {
             @Parameter(description = "업로드할 파일", required = true)
             @RequestPart("file") MultipartFile file
     ) {
+        // 5MB + 확장자 검증
+        FileValidator.validateImageFile(file);
         String url = userService.updateProfileImage(userId, file);
         return ResponseEntity.ok(new ProfileImageResponse(url));
     }
