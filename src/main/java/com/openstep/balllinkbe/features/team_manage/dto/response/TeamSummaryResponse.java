@@ -10,14 +10,16 @@ public class TeamSummaryResponse {
     private final String teamTag;
     private final String displayName;
     private final String region;
-    private final String emblemUrl; // CDN 붙은 URL
+    private final String emblemUrl;
+    private final boolean isOwner;
 
-    public TeamSummaryResponse(Team team, String cdnUrl) {
+    public TeamSummaryResponse(Team team, String cdnUrl, boolean isOwner) {
         this.id = team.getId();
         this.name = team.getName();
         this.teamTag = team.getTeamTag();
         this.displayName = team.getName() + "#" + team.getTeamTag();
         this.region = team.getRegion();
-        this.emblemUrl = cdnUrl; // CDN URL 적용
+        this.emblemUrl = cdnUrl;
+        this.isOwner = isOwner;
     }
 }

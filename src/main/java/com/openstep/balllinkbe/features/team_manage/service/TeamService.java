@@ -43,9 +43,14 @@ public class TeamService {
         return memberships.stream()
                 .map(TeamMember::getTeam)
                 .limit(3)
-                .map(team -> new TeamSummaryResponse(team, toCdnUrl(team.getEmblemUrl())))
+                .map(team -> new TeamSummaryResponse(
+                        team,
+                        toCdnUrl(team.getEmblemUrl()),
+                        team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId()) // ✅ isOwner
+                ))
                 .toList();
     }
+
 
     /** 팀 생성 */
     @Transactional
@@ -113,18 +118,32 @@ public class TeamService {
                 ? teamRepository.findByNameContainingAndIsPublicTrue(q, pageable)
                 : teamRepository.findByIsPublicTrue(pageable);
 
-        return teams.map(team -> new TeamSummaryResponse(team, toCdnUrl(team.getEmblemUrl())));
+        return teams.map(team ->
+                new TeamSummaryResponse(
+                        team,
+                        toCdnUrl(team.getEmblemUrl()),
+                        false // 공개 팀 목록에서는 오너 여부 계산 불필요, 항상 false로
+                )
+        );
     }
 
     /** 팀 상세 조회 */
-    public TeamDetailResponse getTeamDetail(Long teamId) {
+    public TeamDetailResponse getTeamDetail(Long teamId, User currentUser) {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
 
         long playerCount = playerRepository.countByTeamIdAndIsActiveTrue(teamId);
 
-        return new TeamDetailResponse(team, playerCount, toCdnUrl(team.getEmblemUrl()));
+        boolean isOwner = currentUser != null && team.getOwnerUser() != null &&
+                team.getOwnerUser().getId().equals(currentUser.getId());
+
+        String ownerProfileUrl = team.getOwnerUser() != null
+                ? toCdnUrl(team.getOwnerUser().getProfileImagePath())
+                : null;
+
+        return new TeamDetailResponse(team, playerCount, toCdnUrl(team.getEmblemUrl()), isOwner, ownerProfileUrl);
     }
+
 
     /** 팀 삭제 */
     @Transactional

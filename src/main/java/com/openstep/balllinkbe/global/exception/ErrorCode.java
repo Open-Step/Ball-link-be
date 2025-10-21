@@ -37,6 +37,7 @@ public enum ErrorCode {
     // File
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
+    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "파일 크기가 5MB를 초과했습니다."),
 
     // Record
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록 정보를 찾을 수 없습니다."),
