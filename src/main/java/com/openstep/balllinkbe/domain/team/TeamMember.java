@@ -1,5 +1,6 @@
 package com.openstep.balllinkbe.domain.team;
 
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -23,13 +24,13 @@ public class TeamMember {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    /** ✅ 등번호 (nullable 허용, 팀별 등록번호) */
+    /** 등번호 (nullable 허용, 팀별 등록번호) */
     @Column(name = "back_number")
     private Integer backNumber;
 
-    /** 포지션 (예: G, F, C 등) */
+    @Enumerated(EnumType.STRING)
     @Column(length = 10)
-    private String position;
+    private Position position;
 
     /** 주요 활동 지역 */
     @Column(length = 100)

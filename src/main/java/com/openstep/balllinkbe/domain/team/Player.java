@@ -1,5 +1,6 @@
 package com.openstep.balllinkbe.domain.team;
 
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -42,6 +43,4 @@ public class Player {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
-
-    public enum Position { PG, SG, SF, PF, C }
 }
