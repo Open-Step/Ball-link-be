@@ -2,6 +2,7 @@ package com.openstep.balllinkbe.domain.tournament;
 
 import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,7 +28,7 @@ public class TournamentEntry {
     private Short number;
 
     @Enumerated(EnumType.STRING)
-    private Player.Position position;
+    private Position position;
 
     private String note;
     private boolean locked;

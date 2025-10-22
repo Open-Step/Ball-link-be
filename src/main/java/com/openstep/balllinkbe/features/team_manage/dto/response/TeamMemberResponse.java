@@ -1,6 +1,7 @@
 package com.openstep.balllinkbe.features.team_manage.dto.response;
 
 import com.openstep.balllinkbe.domain.team.TeamMember;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,8 +22,8 @@ public class TeamMemberResponse {
     @Schema(description = "등번호")
     private Integer backNumber;
 
-    @Schema(description = "포지션 (예: G, F, C)")
-    private String position;
+    @Schema(description = "포지션 (PG, SG, SF, PF, C 중 하나)")
+    private Position position;
 
     @Schema(description = "로케이션 (주로 뛰는 지역)")
     private String location;

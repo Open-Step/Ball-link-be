@@ -26,6 +26,7 @@ public enum ErrorCode {
     PLAYER_NOT_FOUND(HttpStatus.NOT_FOUND, "선수를 찾을 수 없습니다."),
     DUPLICATE_TEAM_TAG(HttpStatus.CONFLICT, "팀 태그가 중복되었습니다."),
     MAX_TEAM_LIMIT(HttpStatus.BAD_REQUEST, "최대 가입 가능한 팀 수를 초과했습니다."),
+    PERMISSION_DENIED(HttpStatus.FORBIDDEN, "해당 팀의 멤버만 접근할 수 있습니다."),
 
     // Invite
     INVALID_INVITE(HttpStatus.BAD_REQUEST, "유효하지 않은 초대 코드입니다."),

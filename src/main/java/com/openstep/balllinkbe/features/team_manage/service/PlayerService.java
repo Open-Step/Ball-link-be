@@ -4,6 +4,7 @@ import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.team.TeamMember;
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.features.team_manage.dto.request.CreatePlayerRequest;
 import com.openstep.balllinkbe.features.team_manage.dto.request.UpdatePlayerRequest;
 import com.openstep.balllinkbe.features.team_manage.dto.response.PlayerResponse;
@@ -43,7 +44,7 @@ public class PlayerService {
                 .user(request.getUserId() != null ? new User(request.getUserId()) : null)
                 .name(request.getName())
                 .number(request.getNumber())
-                .position(Player.Position.valueOf(request.getPosition()))
+                .position(Position.valueOf(request.getPosition()))
                 .note(request.getNote())
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
@@ -75,7 +76,8 @@ public class PlayerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAYER_NOT_FOUND));
 
         if (request.getNumber() != null) player.setNumber(request.getNumber());
-        if (request.getPosition() != null) player.setPosition(Player.Position.valueOf(request.getPosition()));
+        if (request.getPosition() != null)
+            player.setPosition(Position.valueOf(request.getPosition()));
         if (request.getNote() != null) player.setNote(request.getNote());
         player.setUpdatedAt(LocalDateTime.now());
 
@@ -132,7 +134,7 @@ public class PlayerService {
                 .user(member.getUser())
                 .name(member.getUser().getName())
                 .number(request.getNumber())
-                .position(Player.Position.valueOf(request.getPosition()))
+                .position(Position.valueOf(request.getPosition()))
                 .note(request.getNote())
                 .isActive(true)
                 .createdAt(LocalDateTime.now())

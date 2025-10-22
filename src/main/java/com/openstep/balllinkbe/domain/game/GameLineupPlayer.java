@@ -2,6 +2,7 @@ package com.openstep.balllinkbe.domain.game;
 
 import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,7 +31,7 @@ public class GameLineupPlayer {
     private Short number;
 
     @Enumerated(EnumType.STRING)
-    private Player.Position position;
+    private Position position;
 
     public enum Side { HOME, AWAY }
 }
