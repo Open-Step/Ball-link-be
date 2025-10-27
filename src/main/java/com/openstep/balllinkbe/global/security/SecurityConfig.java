@@ -1,5 +1,6 @@
 package com.openstep.balllinkbe.global.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,16 +23,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CORS 설정 활성화 (아래 Bean과 자동 연결됨)
+                // ✅ CORS 설정
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // CSRF 비활성화 (API 서버니까 필요 없음)
+                // ✅ CSRF 비활성화
                 .csrf(csrf -> csrf.disable())
-
-                // 세션을 쓰지 않음 (JWT 사용)
+                // ✅ 세션 비활성화 (JWT)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 인가 규칙
+                // ✅ 인가 규칙
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -42,8 +40,20 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-
-                // JWT 필터 추가
+                // ✅ 인증 실패 / 권한 거부 핸들러 추가
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"error\": \"Unauthorized\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"error\": \"Forbidden\"}");
+                        })
+                )
+                // ✅ JWT 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
