@@ -31,6 +31,8 @@ public class KakaoAuthController {
         // refreshToken을 HttpOnly 쿠키로 발급
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", tokens.getRefreshToken())
                 .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
                 .path("/")
                 .maxAge(Duration.ofDays(7))
                 .build();
