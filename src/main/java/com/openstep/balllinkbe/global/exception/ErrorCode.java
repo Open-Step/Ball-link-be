@@ -58,7 +58,8 @@ public enum ErrorCode {
     VENUE_NOT_FOUND(HttpStatus.NOT_FOUND, "장소를 찾을 수 없습니다."),
 
     // Game
-    GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "경기를 찾을 수 없습니다.");
+    GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "경기를 찾을 수 없습니다."),
+    INVALID_GAME_TYPE(HttpStatus.BAD_REQUEST, "유효하지 않은 경기 타입입니다.");
 
     private final HttpStatus status;
     private final String message;
