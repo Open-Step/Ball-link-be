@@ -20,44 +20,52 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository; // 👈 추가
-
+    private final UserRepository userRepository;
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+
+        // 인증이 필요 없는 경로는 필터 통과시킴
+        if (path.startsWith("/api/v1/auth/") ||
+                path.startsWith("/swagger-ui/") ||
+                path.startsWith("/v3/api-docs/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Authorization 헤더가 없으면 바로 다음 필터로 넘김
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // 토큰 검증
         String token = header.substring(7);
 
         if (jwtTokenProvider.validateToken(token)) {
             Long userId = jwtTokenProvider.getUserId(token);
 
-            // User 엔티티 조회
-            User user = userRepository.findById(userId)
-                    .orElse(null); // 없으면 anonymous처럼 처리할 수도 있음
+            User user = userRepository.findById(userId).orElse(null);
 
             if (user != null) {
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                user, // principal에 User 엔티티 넣음
+                                user,
                                 null,
-                                null // 권한 필요하면 user.getAuthorities() 같은 걸 넣을 수 있음
+                                null
                         );
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                request.setAttribute("userId", userId); // 필요하면 유지
+                request.setAttribute("userId", userId);
             }
         }
 
         filterChain.doFilter(request, response);
     }
+
 }
