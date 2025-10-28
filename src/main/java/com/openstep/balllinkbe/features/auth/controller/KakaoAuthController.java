@@ -39,10 +39,9 @@ public class KakaoAuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
 
         // accessToken을 JSON 형태로 응답
+        // isNew:True, False 추가
         return ResponseEntity.ok(Map.of(
                 "accessToken", tokens.getAccessToken()
         ));
     }
-
-
 }

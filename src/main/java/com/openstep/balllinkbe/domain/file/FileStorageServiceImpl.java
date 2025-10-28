@@ -2,49 +2,19 @@ package com.openstep.balllinkbe.domain.file;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.net.URI;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Service
 public class FileStorageServiceImpl implements FileStorageService {
 
-    @Value("${cdn.base-url}")
-    private String cdnBaseUrl;
-
-    @Value("${ncp.object-storage.endpoint}")
-    private String endpoint;
-
-    @Value("${ncp.object-storage.region}")
-    private String region;
-
-    @Value("${ncp.object-storage.bucket}")
-    private String bucket;
-
-    @Value("${ncp.object-storage.access-key}")
-    private String accessKey;
-
-    @Value("${ncp.object-storage.secret-key}")
-    private String secretKey;
-
-    private S3Client buildClient() {
-        return S3Client.builder()
-                .endpointOverride(URI.create(endpoint))
-                .region(Region.of(region))
-                .credentialsProvider(
-                        StaticCredentialsProvider.create(
-                                AwsBasicCredentials.create(accessKey, secretKey)
-                        )
-                )
-                .build();
-    }
+    /** 로컬 저장소 루트 경로 (예: /var/www) */
+    @Value("${file.storage.root:/var/www}")
+    private String storageRoot;
 
     @Override
     public String storeFile(Long ownerId, FileMeta.OwnerType ownerType, FileMeta.FileCategory category,
@@ -54,44 +24,30 @@ public class FileStorageServiceImpl implements FileStorageService {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String fileName = ownerId + "_" + timestamp + "." + ext;
 
-        // 상대경로 결정
+        // 상대경로 (profiles / teams)
         String relativePath = switch (category) {
-            case PROFILE -> "profiles/" + ownerId + "/" + fileName;
-            case EMBLEM -> "teams/" + ownerId + "/" + fileName;
-            case RESULT -> "scrimmages/" + ownerId + "/" + fileName;
-            case DOC -> "files/" + ownerId + "/" + fileName;
+            case PROFILE -> "profiles/" + ownerId + "_" + fileName;
+            case EMBLEM -> "teams/" + ownerId + "_" + fileName;
+            default -> throw new IllegalArgumentException("지원하지 않는 파일 카테고리입니다: " + category);
         };
 
-        // === 업로드 ===
-        try (S3Client s3 = buildClient()) {
-            s3.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(bucket)
-                            .key(relativePath)
-                            .contentType(detectContentType(ext))
-                            .build(),
-                    RequestBody.fromBytes(content)
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("파일 업로드 실패: " + relativePath, e);
+        // 실제 저장 경로
+        File targetFile = new File(storageRoot, relativePath);
+        targetFile.getParentFile().mkdirs();
+
+        try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+            fos.write(content);
+        } catch (IOException e) {
+            throw new RuntimeException("파일 저장 실패: " + targetFile.getAbsolutePath(), e);
         }
 
+        // DB에는 상대경로만 저장
         return relativePath;
     }
 
     @Override
     public String toCdnUrl(String relativePath) {
-        // 절대경로 변환 안 함. 그대로 반환
+        // CDN 생략 — 절대경로로 변환하지 않고 그대로 반환
         return relativePath;
-    }
-
-    private String detectContentType(String ext) {
-        return switch (ext.toLowerCase()) {
-            case "jpg", "jpeg" -> "image/jpeg";
-            case "png" -> "image/png";
-            case "gif" -> "image/gif";
-            case "pdf" -> "application/pdf";
-            default -> "application/octet-stream";
-        };
     }
 }
