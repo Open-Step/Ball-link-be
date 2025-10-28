@@ -27,7 +27,7 @@ public class ScrimmagePdfService {
         var head = teamRecordRepository.getGameHeader(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECORD_NOT_FOUND));
 
-        // ✅ head에 isScrimmage 없더라도 그냥 통과 (다른 파일 안건드림)
+        // head에 isScrimmage 없더라도 그냥 통과 (다른 파일 안건드림)
         // -> 자체전 여부 검증 스킵
 
         var teamStats = teamRecordRepository.findTeamStatsByGame(gameId);
@@ -155,7 +155,7 @@ public class ScrimmagePdfService {
         sb.append("</div>")
                 .append("<div class='score'>").append(homePts).append(" : ").append(awayPts).append("</div>");
 
-        // ✅ GamePdfService 안 건드리기 → 같은 로직 복사해서 사용
+        // GamePdfService 안 건드리기 → 같은 로직 복사해서 사용
         sb.append(renderTeamBox(dto.getHome(), true,  homeBadge, homeQ, playerQ));
         sb.append(renderTeamBox(dto.getAway(), false, awayBadge, awayQ, playerQ));
 

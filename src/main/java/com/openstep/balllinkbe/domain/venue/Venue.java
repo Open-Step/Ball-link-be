@@ -15,7 +15,6 @@ public class Venue {
     @Column(nullable = false, length = 150)
     private String name;
 
-    private String address;
     private String phone;
 
     private LocalDateTime createdAt;
