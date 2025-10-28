@@ -148,35 +148,31 @@ public class TeamService {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
 
-        long playerCount = playerRepository.countByTeamIdAndIsActiveTrue(teamId);
+        boolean isOwner = team.getOwnerUser() != null &&
+                team.getOwnerUser().getId().equals(currentUser.getId());
 
-        boolean isOwner = false;
-        boolean isIncluded = false;
+        boolean isIncluded = teamMemberRepository.existsByTeamIdAndUserIdAndLeftAtIsNull(teamId, currentUser.getId());
 
-        // 로그인 사용자만 소속/팀장 여부 계산
-        if (currentUser != null) {
-            Long userId = currentUser.getId();
+        // Role Enum 그대로 전달
+        TeamMember.Role myRole = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
+                .map(TeamMember::getRole)
+                .orElse(null);
 
-            if (team.getOwnerUser() != null && team.getOwnerUser().getId().equals(userId)) {
-                isOwner = true;
-            }
+        long playerCount = playerRepository.countByTeamIdAndDeletedAtIsNull(teamId);
 
-            // 소속 여부
-            isIncluded = teamMemberRepository.existsByTeamIdAndUserIdAndLeftAtIsNull(teamId, userId);
+        String ownerProfileUrl = null;
+        if (team.getOwnerUser() != null && team.getOwnerUser().getProfileImagePath() != null) {
+            ownerProfileUrl = team.getOwnerUser().getProfileImagePath();
         }
 
-        String ownerProfileUrl = team.getOwnerUser() != null
-                ? team.getOwnerUser().getProfileImagePath()
-                : null;
-
-        // isIncluded 전달 가능한 오버로딩 생성자 사용
         return new TeamDetailResponse(
                 team,
                 playerCount,
-                team.getEmblemUrl(), // 상대경로 그대로
+                team.getEmblemUrl(),
                 isOwner,
                 isIncluded,
-                ownerProfileUrl
+                ownerProfileUrl,
+                myRole
         );
     }
 
@@ -259,4 +255,16 @@ public class TeamService {
             throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
         }
     }
+
+    public List<TeamSummaryResponse> getAllTeams() {
+        return teamRepository.findAll().stream()
+                .map(team -> new TeamSummaryResponse(
+                        team,
+                        team.getEmblemUrl(),
+                        false // owner 여부는 조회자 기준이 아니므로 false로
+                ))
+                .toList();
+    }
+
+
 }

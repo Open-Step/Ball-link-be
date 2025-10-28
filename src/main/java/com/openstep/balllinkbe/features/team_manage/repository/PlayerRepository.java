@@ -13,4 +13,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByIdAndTeamId(Long id, Long teamId);
     boolean existsByTeamIdAndNumberAndIsActiveTrue(Long teamId, int number);
     long countByTeamIdAndIsActiveTrue(Long teamId);
+
+    long countByTeamIdAndDeletedAtIsNull(Long teamId);
 }

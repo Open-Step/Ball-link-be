@@ -64,6 +64,13 @@ public class TeamController {
         return ResponseEntity.ok(Map.of("url", url));
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "전체 팀 목록 조회 (공개 + 비공개, 페이징 없음)")
+    public ResponseEntity<List<TeamSummaryResponse>> getAllTeams() {
+        List<TeamSummaryResponse> teams = teamService.getAllTeams();
+        return ResponseEntity.ok(teams);
+    }
+
     @GetMapping
     @Operation(summary = "팀 목록 조회 (공개팀만)")
     public ResponseEntity<Page<TeamSummaryResponse>> getTeams(@RequestParam(defaultValue = "0") int page,
