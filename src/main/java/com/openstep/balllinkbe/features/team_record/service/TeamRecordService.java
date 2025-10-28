@@ -16,8 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -165,26 +164,67 @@ public class TeamRecordService {
         if (teamStats.isEmpty()) throw new CustomException(ErrorCode.RECORD_NOT_FOUND);
 
         // 홈/어웨이 팀 매핑
-        var homeTotals = teamStats.stream().filter(s -> s.getTeam() != null &&
-                        s.getTeam().getId() != null && s.getTeam().getId().equals(head.getHomeTeamId()))
+        var homeTotals = teamStats.stream()
+                .filter(s -> s.getTeam() != null && Objects.equals(s.getTeam().getId(), head.getHomeTeamId()))
                 .findFirst().orElse(null);
-        var awayTotals = teamStats.stream().filter(s -> s.getTeam() != null &&
-                        s.getTeam().getId() != null && s.getTeam().getId().equals(head.getAwayTeamId()))
+        var awayTotals = teamStats.stream()
+                .filter(s -> s.getTeam() != null && Objects.equals(s.getTeam().getId(), head.getAwayTeamId()))
                 .findFirst().orElse(null);
 
         // 선수 라인업
         var lines = teamRecordRepository.findPlayerLines(gameId);
         var homePlayers = lines.stream()
-                .filter(l -> head.getHomeTeamId() != null && head.getHomeTeamId().equals(l.getTeamId()))
+                .filter(l -> Objects.equals(head.getHomeTeamId(), l.getTeamId()))
                 .map(GameBoxscoreResponse.PlayerLine::from)
                 .toList();
         var awayPlayers = lines.stream()
-                .filter(l -> head.getAwayTeamId() != null && head.getAwayTeamId().equals(l.getTeamId()))
+                .filter(l -> Objects.equals(head.getAwayTeamId(), l.getTeamId()))
                 .map(GameBoxscoreResponse.PlayerLine::from)
                 .toList();
 
-        var homeBox = GameBoxscoreResponse.TeamBox.from(head.getHomeTeamId(), head.getHomeTeamName(), homeTotals, homePlayers);
-        var awayBox = GameBoxscoreResponse.TeamBox.from(head.getAwayTeamId(), head.getAwayTeamName(), awayTotals, awayPlayers);
+        var homeBox = GameBoxscoreResponse.TeamBox.from(
+                head.getHomeTeamId(), head.getHomeTeamName(), homeTotals, homePlayers);
+        var awayBox = GameBoxscoreResponse.TeamBox.from(
+                head.getAwayTeamId(), head.getAwayTeamName(), awayTotals, awayPlayers);
+
+        // ──────────────────────────────
+        // 쿼터별 득점 계산 (PDF와 동일 로직)
+        // ──────────────────────────────
+        int[] homeQ = new int[]{0, 0, 0, 0, 0};
+        int[] awayQ = new int[]{0, 0, 0, 0, 0};
+        for (var q : teamRecordRepository.findQuarterScores(gameId)) {
+            int idx = Math.min(q.getPeriod(), 5) - 1;
+            if (Objects.equals(head.getHomeTeamId(), q.getTeamId())) homeQ[idx] = q.getPts();
+            if (Objects.equals(head.getAwayTeamId(), q.getTeamId())) awayQ[idx] = q.getPts();
+        }
+
+        Map<Long, int[]> playerQ = new HashMap<>();
+        for (var p : teamRecordRepository.findPlayerQuarterScores(gameId)) {
+            int idx = Math.min(p.getPeriod(), 5) - 1;
+            int[] arr = playerQ.computeIfAbsent(p.getPlayerId(), __ -> new int[]{0, 0, 0, 0, 0});
+            arr[idx] = p.getPts();
+        }
+
+        // ──────────────────────────────
+        // 선수별 쿼터별 득점 추가
+        // ──────────────────────────────
+        homeBox.getPlayers().forEach(p -> {
+            int[] q = playerQ.getOrDefault(p.getPlayerId(), new int[]{0, 0, 0, 0, 0});
+            p.setQ1(q[0]);
+            p.setQ2(q[1]);
+            p.setQ3(q[2]);
+            p.setQ4(q[3]);
+            p.setOt(q[4]);
+        });
+
+        awayBox.getPlayers().forEach(p -> {
+            int[] q = playerQ.getOrDefault(p.getPlayerId(), new int[]{0, 0, 0, 0, 0});
+            p.setQ1(q[0]);
+            p.setQ2(q[1]);
+            p.setQ3(q[2]);
+            p.setQ4(q[3]);
+            p.setOt(q[4]);
+        });
 
         return GameBoxscoreResponse.builder()
                 .gameId(head.getGameId())
@@ -195,6 +235,5 @@ public class TeamRecordService {
                 .home(homeBox)
                 .away(awayBox)
                 .build();
-
     }
 }

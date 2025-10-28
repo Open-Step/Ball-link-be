@@ -50,6 +50,9 @@ public class GameBoxscoreResponse {
         private int pf, tov;
         private BigDecimal minutes;
 
+        // 쿼터별 득점
+        private int q1, q2, q3, q4, ot;
+
         public static PlayerLine from(PlayerLineProjection p) {
             return PlayerLine.builder()
                     .playerId(p.getPlayerId())

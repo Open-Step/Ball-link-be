@@ -1,6 +1,7 @@
 package com.openstep.balllinkbe.features.team_manage.dto.response;
 
 import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.TeamMember;
 import lombok.Getter;
 
 import java.time.LocalDate;
@@ -21,13 +22,15 @@ public class TeamDetailResponse {
     private final boolean isOwner;
     private final boolean isIncluded;
     private final long playerCount;
+    private final TeamMember.Role myRole;
 
     public TeamDetailResponse(Team team,
                               long playerCount,
                               String emblemUrl,
                               boolean isOwner,
                               boolean isIncluded,
-                              String ownerProfileUrl) {
+                              String ownerProfileUrl,
+                              TeamMember.Role myRole) {
         this.id = team.getId();
         this.name = team.getName();
         this.teamTag = team.getTeamTag();
@@ -42,5 +45,6 @@ public class TeamDetailResponse {
         this.isOwner = isOwner;
         this.isIncluded = isIncluded;
         this.playerCount = playerCount;
+        this.myRole = myRole;
     }
 }
