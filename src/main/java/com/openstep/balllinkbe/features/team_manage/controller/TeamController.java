@@ -71,13 +71,12 @@ public class TeamController {
         return ResponseEntity.ok(teams);
     }
 
+
     @GetMapping
-    @Operation(summary = "팀 목록 조회 (공개팀만)")
-    public ResponseEntity<Page<TeamSummaryResponse>> getTeams(@RequestParam(defaultValue = "0") int page,
-                                                              @RequestParam(defaultValue = "20") int size,
-                                                              @RequestParam(defaultValue = "name,asc") String sort,
-                                                              @RequestParam(required = false) String q) {
-        return ResponseEntity.ok(teamService.getTeams(page, size, sort, q));
+    @Operation(summary = "팀 목록 조회 (공개팀만, 페이징 없음)")
+    public ResponseEntity<List<TeamSummaryResponse>> getTeams(@RequestParam(required = false) String q) {
+        List<TeamSummaryResponse> teams = teamService.getTeams(q);
+        return ResponseEntity.ok(teams);
     }
 
     @Operation(summary = "팀 상세 조회")

@@ -5,6 +5,7 @@ import com.openstep.balllinkbe.domain.team.JoinRequest;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.features.team_join.dto.request.JoinRequestDto;
 import com.openstep.balllinkbe.features.team_join.dto.request.RejectDto;
+import com.openstep.balllinkbe.features.team_join.dto.response.JoinRequestResponse;
 import com.openstep.balllinkbe.features.team_join.service.InviteService;
 import com.openstep.balllinkbe.features.team_join.service.JoinRequestService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,12 +81,15 @@ public class TeamJoinController {
 
     /** 신청 목록 조회 */
     @GetMapping("/teams/{teamId}/requests")
-    @Operation(summary = "가입 신청 목록 조회", description = "팀장/매니저가 특정 팀의 가입 신청 내역을 조회합니다. 상태(status=PENDING 등)로 필터링 가능합니다.")
-    public ResponseEntity<List<JoinRequest>> listRequests(@PathVariable Long teamId,
-                                                          @RequestParam JoinRequest.Status status,
-                                                          @AuthenticationPrincipal User currentUser) {
+    @Operation(summary = "가입 신청 목록 조회", description = "팀장/매니저가 특정 팀의 가입 신청 내역을 조회합니다.")
+    public ResponseEntity<List<JoinRequestResponse>> listRequests(
+            @PathVariable Long teamId,
+            @RequestParam JoinRequest.Status status,
+            @AuthenticationPrincipal User currentUser
+    ) {
         return ResponseEntity.ok(joinRequestService.listRequests(teamId, currentUser.getId(), status));
     }
+
 
     /** 신청 수락 */
     @PostMapping("/requests/{reqId}/accept")
