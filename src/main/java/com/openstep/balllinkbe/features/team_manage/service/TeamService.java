@@ -44,11 +44,15 @@ public class TeamService {
         return memberships.stream()
                 .map(TeamMember::getTeam)
                 .limit(3)
-                .map(team -> new TeamSummaryResponse(
-                        team,
-                        team.getEmblemUrl(), // 상대경로 그대로
-                        team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId())
-                ))
+                .map(team -> {
+                    long memberCount = teamMemberRepository.countByTeamIdAndLeftAtIsNull(team.getId());
+                    return new TeamSummaryResponse(
+                            team,
+                            team.getEmblemUrl(),
+                            team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId()),
+                            memberCount
+                    );
+                })
                 .toList();
     }
 
@@ -127,21 +131,26 @@ public class TeamService {
         return new TeamResponse(updated, updated.getEmblemUrl());
     }
 
-    /** 팀 목록 조회 */
-    public Page<TeamSummaryResponse> getTeams(int page, int size, String sort, String q) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sort.split(",")));
-        Page<Team> teams = (q != null && !q.isBlank())
-                ? teamRepository.findByNameContainingAndIsPublicTrue(q, pageable)
-                : teamRepository.findByIsPublicTrue(pageable);
 
-        return teams.map(team ->
-                new TeamSummaryResponse(
-                        team,
-                        team.getEmblemUrl(), // 상대경로 그대로
-                        false
-                )
-        );
+    /** 팀 목록 조회 (공개팀만, 페이징 없음) */
+    public List<TeamSummaryResponse> getTeams(String q) {
+        List<Team> teams = (q != null && !q.isBlank())
+                ? teamRepository.findByNameContainingAndIsPublicTrue(q)
+                : teamRepository.findByIsPublicTrue();
+
+        return teams.stream()
+                .map(team -> {
+                    long memberCount = teamMemberRepository.countByTeamIdAndLeftAtIsNull(team.getId());
+                    return new TeamSummaryResponse(
+                            team,
+                            team.getEmblemUrl(),
+                            false,
+                            memberCount
+                    );
+                })
+                .toList();
     }
+
 
     /** 팀 상세 조회 */
     public TeamDetailResponse getTeamDetail(Long teamId, User currentUser) {
@@ -258,13 +267,18 @@ public class TeamService {
 
     public List<TeamSummaryResponse> getAllTeams() {
         return teamRepository.findAll().stream()
-                .map(team -> new TeamSummaryResponse(
-                        team,
-                        team.getEmblemUrl(),
-                        false // owner 여부는 조회자 기준이 아니므로 false로
-                ))
+                .map(team -> {
+                    long memberCount = teamMemberRepository.countByTeamIdAndLeftAtIsNull(team.getId());
+                    return new TeamSummaryResponse(
+                            team,
+                            team.getEmblemUrl(),
+                            false,            // owner 여부는 조회자 기준이 아니므로 false
+                            memberCount
+                    );
+                })
                 .toList();
     }
+
 
 
 }

@@ -2,6 +2,7 @@ package com.openstep.balllinkbe.features.team_join.service;
 
 import com.openstep.balllinkbe.domain.team.*;
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.team_join.dto.response.JoinRequestResponse;
 import com.openstep.balllinkbe.features.team_join.repository.InviteRepository;
 import com.openstep.balllinkbe.features.team_join.repository.JoinRequestRepository;
 import com.openstep.balllinkbe.features.team_join.repository.TeamJoinMemberRepository;
@@ -58,10 +59,14 @@ public class JoinRequestService {
     }
 
     /** 가입 신청 목록 조회 */
-    public List<JoinRequest> listRequests(Long teamId, Long userId, JoinRequest.Status status) {
-        permissionService.checkLeaderOrManager(teamId, userId); // 권한 체크
-        return joinRequestRepository.findByTeamIdAndStatus(teamId, status);
+    public List<JoinRequestResponse> listRequests(Long teamId, Long userId, JoinRequest.Status status) {
+        permissionService.checkLeaderOrManager(teamId, userId);
+        return joinRequestRepository.findByTeamIdAndStatus(teamId, status)
+                .stream()
+                .map(JoinRequestResponse::new)
+                .toList();
     }
+
 
     /** 가입 신청 수락 */
     @Transactional
