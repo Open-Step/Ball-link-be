@@ -1,6 +1,7 @@
 package com.openstep.balllinkbe.features.scrimmage.controller;
 
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.scrimmage.dto.request.InitiateScrimmageRequest;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.AddEntryRequest;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.CreateGuestRequest;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.CreateScrimmageRequest;
@@ -22,6 +23,17 @@ import java.util.Map;
 public class ScrimmageController {
 
     private final ScrimmageService scrimmageService;
+
+    /** 자체전 원샷 생성 (생성 + 엔트리 + 세션) */
+    @Operation(summary = "자체전 생성(원샷)", description = "홈/어웨이 팀 지정 + 엔트리 저장 + 세션 발급을 한 번에 처리합니다.")
+    @PostMapping("/initiate")
+    public ResponseEntity<?> initiateScrimmage(
+            @RequestBody InitiateScrimmageRequest req,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        var response = scrimmageService.initiateScrimmage(req, currentUser);
+        return ResponseEntity.ok(response); // { gameId, sessionToken }
+    }
 
     /** 자체전 생성 */
     @Operation(summary = "자체전 생성", description = "홈/원정 팀을 지정하여 자체전을 생성합니다.")

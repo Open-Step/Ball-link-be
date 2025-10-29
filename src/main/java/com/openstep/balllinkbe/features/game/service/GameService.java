@@ -40,7 +40,6 @@ public class GameService {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
 
-        // TODO: 주최자/대회관리 권한 검증 (도메인 도입 후 교체)
         Tournament tournament = em.find(Tournament.class, tournamentId);
         if (tournament == null) throw new CustomException(ErrorCode.TOURNAMENT_NOT_FOUND);
 
@@ -48,11 +47,31 @@ public class GameService {
         Team away = em.find(Team.class, req.getAwayTeamId());
         if (home == null || away == null) throw new CustomException(ErrorCode.TEAM_NOT_FOUND);
 
-        Venue venue = req.getVenueId() != null ? em.find(Venue.class, req.getVenueId()) : null;
-        if (req.getVenueId() != null && venue == null) throw new CustomException(ErrorCode.VENUE_NOT_FOUND);
+        // venueName으로 생성 or 재사용
+        Venue venue = null;
+        if (req.getVenueName() != null && !req.getVenueName().isBlank()) {
+            var existing = em.createQuery("SELECT v FROM Venue v WHERE v.name = :name", Venue.class)
+                    .setParameter("name", req.getVenueName())
+                    .getResultList();
+            if (!existing.isEmpty()) {
+                venue = existing.get(0);
+            } else {
+                venue = Venue.builder()
+                        .name(req.getVenueName())
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                em.persist(venue);
+            }
+        }
 
-        Game.RoundCode round = null;
-        if (req.getRoundCode() != null) round = Game.RoundCode.valueOf(req.getRoundCode());
+        // round 숫자 → enum 매핑
+        Game.RoundCode round = switch (req.getRound() != null ? req.getRound() : 0) {
+            case 16 -> Game.RoundCode.ROUND_OF_16;
+            case 8 -> Game.RoundCode.QF;
+            case 4 -> Game.RoundCode.SF;
+            case 2 -> Game.RoundCode.FINAL;
+            default -> Game.RoundCode.GROUP;
+        };
 
         Game game = Game.builder()
                 .tournament(tournament)
@@ -69,8 +88,6 @@ public class GameService {
                 .build();
 
         Game saved = gameRepository.save(game);
-
-        // 합계 0행 미리 생성(양 팀)
         createZeroTeamStat(saved, home);
         createZeroTeamStat(saved, away);
 

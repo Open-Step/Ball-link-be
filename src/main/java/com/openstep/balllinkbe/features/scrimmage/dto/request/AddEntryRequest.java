@@ -17,6 +17,11 @@ public class AddEntryRequest {
     @Schema(description = "원정팀 선수 목록")
     private List<EntryPlayerDto> awayPlayers;
 
+    public AddEntryRequest(List<EntryPlayerDto> homePlayers, List<EntryPlayerDto> awayPlayers) {
+        this.homePlayers = homePlayers;
+        this.awayPlayers = awayPlayers;
+    }
+
     @Getter
     @NoArgsConstructor
     @Schema(description = "라인업 개별 선수 정보 DTO")

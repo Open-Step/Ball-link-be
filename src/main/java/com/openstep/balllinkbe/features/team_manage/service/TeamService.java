@@ -158,7 +158,7 @@ public class TeamService {
                 .map(TeamMember::getRole)
                 .orElse(null);
 
-        long playerCount = playerRepository.countByTeamIdAndDeletedAtIsNull(teamId);
+        long memberCount = teamMemberRepository.countByTeamIdAndLeftAtIsNull(teamId);
 
         String ownerProfileUrl = null;
         if (team.getOwnerUser() != null && team.getOwnerUser().getProfileImagePath() != null) {
@@ -167,7 +167,7 @@ public class TeamService {
 
         return new TeamDetailResponse(
                 team,
-                playerCount,
+                memberCount,
                 team.getEmblemUrl(),
                 isOwner,
                 isIncluded,

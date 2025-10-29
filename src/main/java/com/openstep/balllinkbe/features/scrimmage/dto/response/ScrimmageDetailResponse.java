@@ -49,5 +49,6 @@ public class ScrimmageDetailResponse {
         private String position;
         private boolean starter;
         private boolean guest;
+        private String teamSide;
     }
 }

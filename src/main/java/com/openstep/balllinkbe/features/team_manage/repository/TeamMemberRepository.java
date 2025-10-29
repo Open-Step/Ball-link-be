@@ -28,4 +28,6 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     List<TeamMember> findByUserIdAndLeftAtIsNull(Long userId);
 
     boolean existsByTeamIdAndUserIdAndLeftAtIsNull(Long teamId, Long userId);
+
+    long countByTeamIdAndLeftAtIsNull(Long teamId);
 }
