@@ -3,9 +3,8 @@ package com.openstep.balllinkbe.features.scrimmage.service;
 import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.user.User;
-import com.openstep.balllinkbe.features.scrimmage.dto.request.AddEntryRequest;
-import com.openstep.balllinkbe.features.scrimmage.dto.request.CreateGuestRequest;
-import com.openstep.balllinkbe.features.scrimmage.dto.request.CreateScrimmageRequest;
+import com.openstep.balllinkbe.features.scrimmage.dto.request.*;
+import com.openstep.balllinkbe.features.scrimmage.dto.response.InitiateScrimmageResponse;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
 import com.openstep.balllinkbe.global.exception.CustomException;
 import com.openstep.balllinkbe.global.exception.ErrorCode;
@@ -27,8 +26,65 @@ public class ScrimmageService {
     private final TeamRepository teamRepository;
     private final GameRepository gameRepository;
 
-    // ⚡ 인메모리 게스트 저장 (DB 영향 없이)
+    // 인메모리 라인업 저장 (DB 영향 없이)
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
+
+    /** 🔹 원샷 처리 (자체전 생성 + 엔트리 저장 + 세션발급) */
+    @Transactional
+    public InitiateScrimmageResponse initiateScrimmage(InitiateScrimmageRequest req, User currentUser) {
+        // 1️⃣ 자체전 생성
+        var gameId = createScrimmage(
+                new CreateScrimmageRequest(req.getHomeTeamId(), req.getAwayTeamId()),
+                currentUser
+        );
+
+        // 2️⃣ 엔트리 저장
+        var entryReq = new AddEntryRequest(req.getHomePlayers(), req.getAwayPlayers());
+        saveEntries(gameId, entryReq, currentUser);
+
+        // 3️⃣ 세션 발급
+        String sessionToken = createScoreSession(gameId, currentUser);
+
+        return new InitiateScrimmageResponse(gameId, sessionToken);
+    }
+
+    /** 라인업 저장 */
+    @Transactional
+    public void saveEntries(Long gameId, AddEntryRequest req, User currentUser) {
+        var all = new java.util.ArrayList<ScrimmageDetailResponse.PlayerLineup>();
+
+        // 홈팀
+        if (req.getHomePlayers() != null) {
+            for (var e : req.getHomePlayers()) {
+                all.add(ScrimmageDetailResponse.PlayerLineup.builder()
+                        .playerId(e.getPlayerId())
+                        .name(e.getName())
+                        .number(e.getNumber())
+                        .position(e.getPosition())
+                        .starter(e.isStarter())
+                        .guest(e.getPlayerId() == null)
+                        .teamSide("HOME")
+                        .build());
+            }
+        }
+
+        // 어웨이팀
+        if (req.getAwayPlayers() != null) {
+            for (var e : req.getAwayPlayers()) {
+                all.add(ScrimmageDetailResponse.PlayerLineup.builder()
+                        .playerId(e.getPlayerId())
+                        .name(e.getName())
+                        .number(e.getNumber())
+                        .position(e.getPosition())
+                        .starter(e.isStarter())
+                        .guest(e.getPlayerId() == null)
+                        .teamSide("AWAY")
+                        .build());
+            }
+        }
+
+        guestMap.put(gameId, all);
+    }
 
     /** 자체전 생성 */
     @Transactional
@@ -50,32 +106,6 @@ public class ScrimmageService {
         return game.getId();
     }
 
-    /** 라인업 저장 (DB 또는 메모리 반영) */
-    @Transactional
-    public void saveEntries(Long gameId, AddEntryRequest req, User currentUser) {
-        // 현재는 DB 영향 없이 메모리 상에만 저장
-        var allPlayers = new java.util.ArrayList<ScrimmageDetailResponse.PlayerLineup>();
-        req.getHomePlayers().forEach(p -> allPlayers.add(
-                ScrimmageDetailResponse.PlayerLineup.builder()
-                        .playerId(p.getPlayerId())
-                        .name(p.getName())
-                        .number(p.getNumber())
-                        .position(p.getPosition())
-                        .starter(p.isStarter())
-                        .guest(false)
-                        .build()));
-        req.getAwayPlayers().forEach(p -> allPlayers.add(
-                ScrimmageDetailResponse.PlayerLineup.builder()
-                        .playerId(p.getPlayerId())
-                        .name(p.getName())
-                        .number(p.getNumber())
-                        .position(p.getPosition())
-                        .starter(p.isStarter())
-                        .guest(false)
-                        .build()));
-        guestMap.put(gameId, allPlayers);
-    }
-
     /** 게스트 추가 */
     public Long addGuest(Long gameId, CreateGuestRequest req, User currentUser) {
         var guests = guestMap.computeIfAbsent(gameId, __ -> new java.util.ArrayList<>());
@@ -87,6 +117,7 @@ public class ScrimmageService {
                 .position(req.getPosition())
                 .starter(false)
                 .guest(true)
+                .teamSide("HOME") // 기본 HOME으로 처리 (필요시 프론트에서 지정 가능)
                 .build());
         return guestId;
     }
@@ -97,8 +128,12 @@ public class ScrimmageService {
                 .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
 
         var lineup = guestMap.getOrDefault(gameId, List.of());
-        var home = lineup.stream().filter(p -> !p.isGuest()).toList();
-        var away = lineup.stream().filter(p -> p.isGuest()).toList();
+        var home = lineup.stream()
+                .filter(p -> "HOME".equalsIgnoreCase(p.getTeamSide()))
+                .toList();
+        var away = lineup.stream()
+                .filter(p -> "AWAY".equalsIgnoreCase(p.getTeamSide()))
+                .toList();
 
         return ScrimmageDetailResponse.builder()
                 .gameId(game.getId())
