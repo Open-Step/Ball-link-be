@@ -25,6 +25,14 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
                                    WebSocketHandler wsHandler,
                                    Map<String, Object> attributes) {
 
+        String path = request.getURI().getPath();
+
+        // 1. SockJS handshake 사전 요청(/info)은 인증 없이 통과시킴
+        if (path.endsWith("/info")) {
+            return true;
+        }
+
+        // 2. 실제 WebSocket handshake일 때만 인증 검증
         var uri = request.getURI();
         var qp = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
 
@@ -50,7 +58,7 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
             return false;
         }
 
-        // 컨트롤러 판단 (세션 생성자 == 본인)
+        // 권한 설정
         String role = scoreSession.getCreatedBy().getId().equals(userId)
                 ? "CONTROLLER"
                 : "VIEWER";
