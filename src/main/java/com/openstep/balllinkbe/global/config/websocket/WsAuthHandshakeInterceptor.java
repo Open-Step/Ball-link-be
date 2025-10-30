@@ -28,7 +28,7 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
         String path = request.getURI().getPath();
 
         // 1. SockJS handshake 사전 요청(/info)은 인증 없이 통과시킴
-        if (path.endsWith("/info")) {
+        if (path.contains("/info")) {
             return true;
         }
 
