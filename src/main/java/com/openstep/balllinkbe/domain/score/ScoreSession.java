@@ -1,34 +1,33 @@
 package com.openstep.balllinkbe.domain.score;
 
-import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
+@Builder
 @Entity
-@Table(name = "score_sessions",
-        uniqueConstraints = @UniqueConstraint(name = "uk_score_session_token", columnNames = {"session_token"}))
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(name = "score_sessions")
 public class ScoreSession {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "game_id")
-    private Game game;
+    @Column(name = "game_id", nullable = false)
+    private Long gameId;
 
-    @Column(length = 64)
-    private String sessionToken;
+    @Column(name = "tournament_id")
+    private Long tournamentId;
 
-    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "created_by")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
     private User createdBy;
 
+    @Column(nullable = false, unique = true, length = 128)
+    private String token;
+
     private LocalDateTime createdAt;
-    private LocalDateTime expiresAt;
-
-    @Enumerated(EnumType.STRING)
-    private Status status;
-
-    public enum Status { ACTIVE, EXPIRED, CLOSED }
+    private LocalDateTime endedAt;
 }

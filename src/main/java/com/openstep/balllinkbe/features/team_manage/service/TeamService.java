@@ -39,7 +39,7 @@ public class TeamService {
 
     /** 내가 가입한 팀 목록 (최대 3개) */
     public List<TeamSummaryResponse> getMyTeams(User currentUser) {
-        var memberships = teamMemberRepository.findByUserIdAndLeftAtIsNull(currentUser.getId());
+        var memberships = teamMemberRepository.findActiveTeamsByUserId(currentUser.getId());
 
         return memberships.stream()
                 .map(TeamMember::getTeam)

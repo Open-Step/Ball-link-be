@@ -1,11 +1,14 @@
 package com.openstep.balllinkbe.features.team_join.service;
 
 import com.openstep.balllinkbe.domain.team.*;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.team_join.dto.response.JoinAcceptResponse;
 import com.openstep.balllinkbe.features.team_join.dto.response.JoinRequestResponse;
 import com.openstep.balllinkbe.features.team_join.repository.InviteRepository;
 import com.openstep.balllinkbe.features.team_join.repository.JoinRequestRepository;
 import com.openstep.balllinkbe.features.team_join.repository.TeamJoinMemberRepository;
+import com.openstep.balllinkbe.features.team_manage.repository.PlayerRepository;
 import com.openstep.balllinkbe.features.team_manage.repository.TeamRepository;
 import com.openstep.balllinkbe.features.user.repository.UserRepository;
 import com.openstep.balllinkbe.global.exception.CustomException;
@@ -28,10 +31,10 @@ public class JoinRequestService {
     private final InviteRepository inviteRepository;
     private final TeamJoinMemberRepository teamMemberRepository;
     private final TeamPermissionService permissionService;
-
+    private final PlayerRepository playerRepository;
     /** 가입 신청 생성 */
     @Transactional
-    public JoinRequest apply(Long teamId, Long userId, String position, String location, String bio, String inviteCode) {
+    public JoinRequest apply(Long teamId, Long userId, Position position, String location, String bio, String inviteCode) {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
 
@@ -47,7 +50,8 @@ public class JoinRequestService {
         JoinRequest req = JoinRequest.builder()
                 .team(team)
                 .applicant(user)
-                .position(JoinRequest.Position.valueOf(position))
+                // enum 그대로 사용 (valueOf 불필요)
+                .position(position)
                 .location(location)
                 .bio(bio)
                 .invite(invite)
@@ -70,8 +74,8 @@ public class JoinRequestService {
 
     /** 가입 신청 수락 */
     @Transactional
-    public void accept(Long reqId, Long teamId, Long processedBy) {
-        permissionService.checkLeaderOrManager(teamId, processedBy); // 권한 체크
+    public JoinAcceptResponse accept(Long reqId, Long teamId, Long processedBy) {
+        permissionService.checkLeaderOrManager(teamId, processedBy);
 
         JoinRequest req = joinRequestRepository.findById(reqId)
                 .orElseThrow(() -> new CustomException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
@@ -80,19 +84,43 @@ public class JoinRequestService {
             throw new CustomException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
         }
 
-        req.setStatus(JoinRequest.Status.ACCEPTED);
-        req.setProcessedAt(LocalDateTime.now());
+        // User 객체 조회
+        User approver = userRepository.findById(processedBy)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        // 팀 멤버 등록
         TeamMember member = TeamMember.builder()
                 .team(req.getTeam())
                 .user(req.getApplicant())
                 .role(TeamMember.Role.PLAYER)
                 .joinedAt(LocalDateTime.now())
                 .build();
-
         teamMemberRepository.save(member);
+
+        // Player 생성
+        Player player = Player.builder()
+                .team(req.getTeam())
+                .user(req.getApplicant())
+                .name(req.getApplicant().getName())
+                .position(req.getPosition()) // enum 통일되어 문제 없음
+                .isActive(true)
+                .createdAt(LocalDateTime.now())
+                .build();
+        playerRepository.save(player);
+
+        // 가입 요청 상태 갱신
+        req.setStatus(JoinRequest.Status.ACCEPTED);
+        req.setProcessedAt(LocalDateTime.now());
+        req.setProcessedBy(approver); // User 객체로 세팅
         joinRequestRepository.save(req);
+
+        return new JoinAcceptResponse(
+                req.getApplicant().getId(),
+                player.getId(),
+                member.getId()
+        );
     }
+
 
     /** 가입 신청 거절 */
     @Transactional
