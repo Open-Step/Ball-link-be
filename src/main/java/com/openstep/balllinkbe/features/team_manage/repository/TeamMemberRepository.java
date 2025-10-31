@@ -4,6 +4,7 @@ import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.team.TeamMember;
 import com.openstep.balllinkbe.domain.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -30,4 +31,15 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     boolean existsByTeamIdAndUserIdAndLeftAtIsNull(Long teamId, Long userId);
 
     long countByTeamIdAndLeftAtIsNull(Long teamId);
+
+    @Query("""
+    select tm
+    from TeamMember tm
+    join fetch tm.team t
+    where tm.user.id = :userId
+      and tm.leftAt is null
+      and t.deletedAt is null
+""")
+    List<TeamMember> findActiveTeamsByUserId(Long userId);
+
 }

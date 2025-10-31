@@ -5,6 +5,7 @@ import com.openstep.balllinkbe.domain.team.JoinRequest;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.features.team_join.dto.request.JoinRequestDto;
 import com.openstep.balllinkbe.features.team_join.dto.request.RejectDto;
+import com.openstep.balllinkbe.features.team_join.dto.response.JoinAcceptResponse;
 import com.openstep.balllinkbe.features.team_join.dto.response.JoinRequestResponse;
 import com.openstep.balllinkbe.features.team_join.service.InviteService;
 import com.openstep.balllinkbe.features.team_join.service.JoinRequestService;
@@ -93,13 +94,19 @@ public class TeamJoinController {
 
     /** 신청 수락 */
     @PostMapping("/requests/{reqId}/accept")
-    @Operation(summary = "가입 신청 수락", description = "팀장/매니저가 가입 신청을 수락합니다. 수락 시 해당 사용자가 팀 멤버(PLAYER)로 자동 편입됩니다.")
-    public ResponseEntity<Map<String, Boolean>> accept(@PathVariable Long reqId,
-                                                       @RequestParam Long teamId,
-                                                       @AuthenticationPrincipal User currentUser) {
-        joinRequestService.accept(reqId, teamId, currentUser.getId());
-        return ResponseEntity.ok(Map.of("success", true));
+    @Operation(
+            summary = "가입 신청 수락",
+            description = "팀장/매니저가 가입 신청을 수락하면 팀 멤버 및 선수명단에 자동 등록됩니다. 응답으로 userId, playerId, memberId가 반환됩니다."
+    )
+    public ResponseEntity<JoinAcceptResponse> accept(
+            @PathVariable Long reqId,
+            @RequestParam Long teamId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        JoinAcceptResponse response = joinRequestService.accept(reqId, teamId, currentUser.getId());
+        return ResponseEntity.ok(response);
     }
+
 
     /** 신청 거절 */
     @PostMapping("/requests/{reqId}/reject")

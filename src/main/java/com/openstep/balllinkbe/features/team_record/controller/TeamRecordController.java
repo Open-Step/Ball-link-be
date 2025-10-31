@@ -101,4 +101,15 @@ public class TeamRecordController {
     public ResponseEntity<GameBoxscoreResponse> getGameBoxscore(@PathVariable Long gameId) {
         return ResponseEntity.ok(teamRecordService.getGameBoxscore(gameId));
     }
+
+    /** 8) 단일 경기 기본 정보 조회 (박스스코어 아님) */
+    @GetMapping("/games/{gameId}")
+    @Operation(
+            summary = "단일 경기 기본정보 조회",
+            description = "특정 경기의 기본정보(대회명, 일시, 장소, 팀 정보)를 조회합니다. 스코어보드 엔트리 구성 시 사용."
+    )
+    public ResponseEntity<GameInfoResponse> getGameInfo(@PathVariable Long gameId) {
+        return ResponseEntity.ok(teamRecordService.getGameInfo(gameId));
+    }
+
 }

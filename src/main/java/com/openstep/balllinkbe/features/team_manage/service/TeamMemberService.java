@@ -4,6 +4,7 @@ import com.openstep.balllinkbe.domain.team.TeamMember;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.features.team_manage.dto.request.UpdateRoleRequest;
 import com.openstep.balllinkbe.features.team_manage.dto.response.TeamMemberResponse;
+import com.openstep.balllinkbe.features.team_manage.repository.PlayerRepository;
 import com.openstep.balllinkbe.features.team_manage.repository.TeamMemberRepository;
 import com.openstep.balllinkbe.features.team_manage.repository.TeamRepository;
 import com.openstep.balllinkbe.global.exception.CustomException;
@@ -12,6 +13,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -20,7 +22,7 @@ public class TeamMemberService {
 
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
-
+    private final PlayerRepository playerRepository;
     /** 팀 멤버 목록 조회 (비공개 접근제한 포함, 비페이징 버전) */
     public List<TeamMemberResponse> getMembers(Long teamId, User currentUser) {
         // 1. 팀 정보 조회
@@ -105,5 +107,45 @@ public class TeamMemberService {
 
         teamMemberRepository.save(currentLeader);
         teamMemberRepository.save(newLeader);
+    }
+
+    /** 팀원 강퇴 로직 */
+    @Transactional
+    public void kickMember(Long teamId, Long userId, User currentUser) {
+        // 현재 사용자 권한 확인
+        var currentMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUser.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        if (currentMember.getRole() == null ||
+                (currentMember.getRole() != TeamMember.Role.LEADER &&
+                        currentMember.getRole() != TeamMember.Role.MANAGER)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
+
+        // 강퇴 대상 확인
+        var target = teamMemberRepository.findByTeamIdAndUserId(teamId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        // 자기 자신 강퇴 방지
+        if (target.getUser().getId().equals(currentUser.getId())) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+
+        // 팀장 강퇴 금지
+        if (target.getRole() == TeamMember.Role.LEADER) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
+        }
+
+        // 팀원 탈퇴 처리
+        target.setLeftAt(LocalDateTime.now());
+        teamMemberRepository.save(target);
+
+        // 플레이어 엔티티도 비활성화 (같은 유저가 등록된 경우)
+        playerRepository.findByTeamIdAndUserId(teamId, userId)
+                .ifPresent(player -> {
+                    player.setDeletedAt(LocalDateTime.now());
+                    player.setIsActive(false);
+                    playerRepository.save(player);
+                });
     }
 }

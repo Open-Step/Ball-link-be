@@ -58,4 +58,25 @@ public class TeamMemberController {
         teamMemberService.transferOwnership(teamId, request.getToUserId(), currentUser);
         return ResponseEntity.ok(Map.of("success", true));
     }
+
+    /** 팀원 강퇴 */
+    @DeleteMapping("/{userId}")
+    @Operation(
+            summary = "팀원 강퇴",
+            description = """
+        팀장 또는 매니저가 특정 팀원을 강퇴합니다.
+        ⚙처리 내용:
+        - team_members 테이블의 left_at 값을 기록 (논리적 탈퇴)
+        - 해당 유저의 players 엔티티가 존재하면 deleted_at, is_active=false로 비활성화
+        - 팀장은 강퇴할 수 없습니다.
+        """
+    )
+    public ResponseEntity<?> kickMember(
+            @PathVariable Long teamId,
+            @PathVariable Long userId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        teamMemberService.kickMember(teamId, userId, currentUser);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
 }

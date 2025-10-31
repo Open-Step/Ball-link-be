@@ -1,6 +1,11 @@
 package com.openstep.balllinkbe.features.team_record.service;
 
+import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.game.GameTeamStat;
+import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.tournament.Tournament;
+import com.openstep.balllinkbe.domain.venue.Venue;
+import com.openstep.balllinkbe.features.game.repository.GameRepository;
 import com.openstep.balllinkbe.features.team_record.dto.response.*;
 import com.openstep.balllinkbe.features.team_record.repository.TeamRecordRepository;
 import com.openstep.balllinkbe.features.team_record.repository.projection.PlayerAggregateProjection;
@@ -10,6 +15,7 @@ import com.openstep.balllinkbe.features.team_record.repository.projection.Tourna
 import com.openstep.balllinkbe.global.exception.CustomException;
 import com.openstep.balllinkbe.global.exception.ErrorCode;
 import com.openstep.balllinkbe.global.util.PageableUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
@@ -23,7 +29,7 @@ import java.util.*;
 public class TeamRecordService {
 
     private final TeamRecordRepository teamRecordRepository;
-
+    private final GameRepository  gameRepository;
     private double avg(int sum, int games) {
         if (games <= 0) return 0.0;
         return BigDecimal.valueOf((double) sum / games)
@@ -236,4 +242,27 @@ public class TeamRecordService {
                 .away(awayBox)
                 .build();
     }
+
+    @Transactional()
+    public GameInfoResponse getGameInfo(Long gameId) {
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
+
+        Team home = game.getHomeTeam();
+        Team away = game.getAwayTeam();
+        Tournament tournament = game.getTournament();
+        Venue venue = game.getVenue();
+
+        return GameInfoResponse.builder()
+                .gameId(game.getId())
+                .tournamentName(tournament != null ? tournament.getName() : null)
+                .scheduledAt(game.getScheduledAt())
+                .venueName(venue != null ? venue.getName() : null)
+                .homeTeamName(home != null ? home.getName() : null)
+                .homeTeamId(home != null ? home.getId() : null)
+                .awayTeamName(away != null ? away.getName() : null)
+                .awayTeamId(away != null ? away.getId() : null)
+                .build();
+    }
+
 }

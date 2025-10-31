@@ -1,29 +1,56 @@
 package com.openstep.balllinkbe.features.tournament.dto.request;
 
+import com.openstep.balllinkbe.domain.game.Game;
+import com.openstep.balllinkbe.domain.team.Player;
+import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.enums.Position;
+import com.openstep.balllinkbe.domain.tournament.Tournament;
+import com.openstep.balllinkbe.domain.tournament.TournamentEntry;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.Setter;
+import java.util.ArrayList;
 import java.util.List;
 
-@Getter
-@NoArgsConstructor
-@Schema(description = "경기 엔트리 등록 요청 DTO")
+@Getter @Setter
 public class AddEntryRequest {
 
-    @Schema(description = "팀 구분 (HOME / AWAY)", example = "HOME")
-    private String teamSide;
+    @Schema(description = "홈팀 엔트리 목록")
+    private List<PlayerEntry> homeEntries = new ArrayList<>();
 
-    @Schema(description = "선수 목록")
-    private List<EntryPlayerDto> players;
+    @Schema(description = "어웨이팀 엔트리 목록")
+    private List<PlayerEntry> awayEntries = new ArrayList<>();
 
-    @Getter
-    @NoArgsConstructor
-    @Schema(description = "엔트리 선수 정보 DTO")
-    public static class EntryPlayerDto {
-        private Long playerId;
-        private Integer number;
-        private String name;
-        private String position;
-        private boolean starter;
+    public List<TournamentEntry> toEntities(Tournament tournament, Game game) {
+        List<TournamentEntry> result = new ArrayList<>();
+        if (game.getHomeTeam() != null && homeEntries != null)
+            result.addAll(toEntryList(tournament, game.getHomeTeam(), homeEntries));
+        if (game.getAwayTeam() != null && awayEntries != null)
+            result.addAll(toEntryList(tournament, game.getAwayTeam(), awayEntries));
+        return result;
+    }
+
+    private List<TournamentEntry> toEntryList(Tournament tournament, Team team, List<PlayerEntry> entries) {
+        List<TournamentEntry> list = new ArrayList<>();
+        for (PlayerEntry e : entries) {
+            list.add(TournamentEntry.builder()
+                    .tournament(tournament)
+                    .team(team)
+                    .player(Player.builder().id(e.getPlayerId()).build())
+                    .number(e.getNumber())
+                    .position(e.getPosition())
+                    .note(e.getNote())
+                    .locked(false)
+                    .build());
+        }
+        return list;
+    }
+
+    @Getter @Setter
+    public static class PlayerEntry {
+        private Long playerId;     // 필수: Player.id
+        private Short number;      // 등번호
+        private Position position; // PG/SG/SF/PF/C
+        private String note;
     }
 }
