@@ -17,7 +17,7 @@ public class GameCommandService {
 
     private final GameEventWriter eventWriter;
     private final StatAggregator statAggregator;
-    private final StateBuilder stateBuilder;  // ✅ 누락된 부분 추가
+    private final StateBuilder stateBuilder;  // 누락된 부분 추가
     private final SimpMessagingTemplate messaging;
     private final ObjectMapper mapper = new ObjectMapper();
 

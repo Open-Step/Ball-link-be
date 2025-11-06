@@ -25,7 +25,7 @@ public class ScoreSession {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
-    @Column(nullable = false, unique = true, length = 128)
+    @Column(name = "session_token", nullable = false, unique = true, length = 128)
     private String token;
 
     private LocalDateTime createdAt;

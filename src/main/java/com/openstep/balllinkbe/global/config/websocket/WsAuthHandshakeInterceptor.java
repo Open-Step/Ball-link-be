@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 import org.springframework.web.util.UriComponentsBuilder;
+import java.security.Principal;
 
 import java.util.Map;
 
@@ -26,13 +27,11 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
                                    Map<String, Object> attributes) {
 
         String path = request.getURI().getPath();
-
-        // 1. SockJS handshake 사전 요청(/info)은 인증 없이 통과시킴
         if (path.contains("/info")) {
+            System.out.println("[WS] /info handshake bypassed");
             return true;
         }
 
-        // 2. 실제 WebSocket handshake일 때만 인증 검증
         var uri = request.getURI();
         var qp = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
 
@@ -40,33 +39,43 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
         String sessionToken = qp.getFirst("session");
         String jwt = qp.getFirst("access_token");
 
+        System.out.println("[WS] gameId=" + gameId + ", session=" + sessionToken + ", jwt=" + (jwt != null));
+
         if (gameId == null || sessionToken == null || jwt == null) {
+            System.out.println("[WS] missing params");
             return false;
         }
 
-        // JWT 토큰 검증
         if (!jwtTokenProvider.validateToken(jwt)) {
+            System.out.println("[WS] invalid jwt");
             return false;
         }
-        Long userId = jwtTokenProvider.getUserId(jwt);
 
-        // 세션 토큰 검증 (score_sessions)
+        Long userId = jwtTokenProvider.getUserId(jwt);
+        System.out.println("[WS] jwt valid, userId=" + userId);
+
         var scoreSession = scoreSessionRepository
                 .findByGameIdAndSessionTokenAndStatus(gameId, sessionToken, "ACTIVE")
                 .orElse(null);
+
         if (scoreSession == null) {
+            System.out.println("[WS] score session not found");
             return false;
         }
 
-        // 권한 설정
-        String role = scoreSession.getCreatedBy().getId().equals(userId)
+        System.out.println("[WS] score session found, created_by=" + scoreSession.getCreatedBy());
+
+        String role = (scoreSession.getCreatedBy() != null &&
+                scoreSession.getCreatedBy().getId().equals(userId))
                 ? "CONTROLLER"
                 : "VIEWER";
 
         attributes.put("gameId", gameId);
         attributes.put("userId", userId);
         attributes.put("role", role);
+        attributes.put("principal", (Principal) () -> String.valueOf(userId)); // 추가
 
+        System.out.println("[WS] handshake success, role=" + role);
         return true;
     }
 

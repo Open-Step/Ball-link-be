@@ -18,8 +18,8 @@ public class StompConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/api/v1/ws")
                 .setAllowedOriginPatterns("*")
-                .addInterceptors(wsAuthHandshakeInterceptor);
-        // .withSockJS(); // (필요시만)
+                .addInterceptors(wsAuthHandshakeInterceptor)
+                .withSockJS(); // (필요시만)
     }
 
     @Override
