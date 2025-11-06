@@ -10,7 +10,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
-import java.util.Map;
+import java.util.*;
 
 @Controller
 @RequiredArgsConstructor
@@ -20,10 +20,6 @@ public class ScoreStompController {
     private final GameCommandService commandService;
     private final IdempotencyCache idempotencyCache;
 
-    /**
-     * WebSocket Entry Point
-     * 클라이언트 → /app/games.{gameId}.cmd
-     */
     @MessageMapping("/games.{gameId}.cmd")
     public void handleCommand(
             @DestinationVariable Long gameId,
@@ -31,68 +27,66 @@ public class ScoreStompController {
             Principal principal,
             MessageHeaders headers
     ) {
-
         Map<String, Object> meta = (Map<String, Object>) message.get("meta");
         String action = (String) message.get("action");
         String idempotencyKey = meta != null ? (String) meta.get("idempotencyKey") : null;
         String idemKey = gameId + ":" + (idempotencyKey == null ? "noid" : idempotencyKey);
-
-        // 멱등성 캐시 검사
-        if (idempotencyKey != null && idempotencyCache.seen(idemKey)) {
-            idempotencyCache.get(idemKey).ifPresent(cached ->
-                    messaging.convertAndSendToUser(
-                            principal.getName(),
-                            "/queue/games." + gameId + ".ack",
-                            cached
-                    )
-            );
-            return;
-        }
+        String userName = principal != null ? principal.getName() : "anonymous";
 
         try {
-            // 실제 명령 처리 (DB Insert + 통계 반영 + 내부 broadcast)
+            // 멱등성 검사
+            if (idempotencyKey != null && idempotencyCache.seen(idemKey)) {
+                idempotencyCache.get(idemKey).ifPresent(cached ->
+                        messaging.convertAndSendToUser(
+                                userName,
+                                "/queue/games." + gameId + ".ack",
+                                cached
+                        )
+                );
+                return;
+            }
+
+            // 실제 명령 처리
             GameResult result = commandService.handleCommand(gameId, message);
 
-            // ACK 전송
-            Map<String, Object> ack = Map.of(
-                    "type", "ack",
-                    "action", action,
-                    "meta", meta,
-                    "data", Map.of("ok", true)
-            );
+            // ACK 전송 (null-safe)
+            Map<String, Object> ack = new HashMap<>();
+            ack.put("type", "ack");
+            ack.put("action", action);
+            ack.put("meta", meta);
+            ack.put("data", Map.of("ok", true));
 
             messaging.convertAndSendToUser(
-                    principal.getName(),
+                    userName,
                     "/queue/games." + gameId + ".ack",
                     ack
             );
 
-            // 멱등성 캐시에 ACK 저장
-            if (idempotencyKey != null) idempotencyCache.put(idemKey, ack);
+            if (idempotencyKey != null)
+                idempotencyCache.put(idemKey, ack);
 
-            // ① 실시간 이벤트들 전송 (pbp.append)
+            // 이벤트 브로드캐스트
             if (result.getEvents() != null && !result.getEvents().isEmpty()) {
                 result.getEvents().forEach(evt ->
                         messaging.convertAndSend("/topic/games." + gameId + ".public", evt)
                 );
             }
 
-            // ② 전체 상태(state.sync) 전송
+            // 전체 상태(state.sync)
             if (result.getStateSync() != null) {
                 messaging.convertAndSend("/topic/games." + gameId + ".public", result.getStateSync());
             }
 
         } catch (Exception e) {
-            // 예외 발생 시 에러 응답
-            Map<String, Object> err = Map.of(
-                    "type", "error",
-                    "action", action,
-                    "data", Map.of("code", 400, "message", e.getMessage()),
-                    "meta", meta
-            );
+            // 에러 응답도 null-safe
+            Map<String, Object> err = new HashMap<>();
+            err.put("type", "error");
+            err.put("action", action);
+            err.put("data", Map.of("code", 400, "message", e.getMessage()));
+            err.put("meta", meta);
 
             messaging.convertAndSendToUser(
-                    principal.getName(),
+                    userName,
                     "/queue/games." + gameId + ".ack",
                     err
             );

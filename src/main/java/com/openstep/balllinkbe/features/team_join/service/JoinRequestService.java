@@ -84,34 +84,45 @@ public class JoinRequestService {
             throw new CustomException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
         }
 
-        // User 객체 조회
         User approver = userRepository.findById(processedBy)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 팀 멤버 등록
-        TeamMember member = TeamMember.builder()
-                .team(req.getTeam())
-                .user(req.getApplicant())
-                .role(TeamMember.Role.PLAYER)
-                .joinedAt(LocalDateTime.now())
-                .build();
-        teamMemberRepository.save(member);
+        // 🔹 member 변수를 if 밖에서 선언
+        TeamMember member = teamMemberRepository
+                .findByTeamIdAndUserId(teamId, req.getApplicant().getId())
+                .orElse(null);
 
-        // Player 생성
-        Player player = Player.builder()
-                .team(req.getTeam())
-                .user(req.getApplicant())
-                .name(req.getApplicant().getName())
-                .position(req.getPosition()) // enum 통일되어 문제 없음
-                .isActive(true)
-                .createdAt(LocalDateTime.now())
-                .build();
-        playerRepository.save(player);
+        // 팀 멤버 등록 (없을 경우만)
+        if (member == null) {
+            member = TeamMember.builder()
+                    .team(req.getTeam())
+                    .user(req.getApplicant())
+                    .role(TeamMember.Role.PLAYER)
+                    .joinedAt(LocalDateTime.now())
+                    .build();
+            teamMemberRepository.save(member);
+        }
+
+        // Player 생성 (중복 방지)
+        Player player = playerRepository.findByTeamIdAndUserId(teamId, req.getApplicant().getId())
+                .orElse(null);
+
+        if (player == null) {
+            player = Player.builder()
+                    .team(req.getTeam())
+                    .user(req.getApplicant())
+                    .name(req.getApplicant().getName())
+                    .position(req.getPosition())
+                    .isActive(true)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            playerRepository.save(player);
+        }
 
         // 가입 요청 상태 갱신
         req.setStatus(JoinRequest.Status.ACCEPTED);
         req.setProcessedAt(LocalDateTime.now());
-        req.setProcessedBy(approver); // User 객체로 세팅
+        req.setProcessedBy(approver);
         joinRequestRepository.save(req);
 
         return new JoinAcceptResponse(

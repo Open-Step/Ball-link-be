@@ -25,7 +25,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,21 +41,36 @@ public class TeamService {
     private final PlayerRepository playerRepository;
     private final FileStorageService fileStorageService;
 
-    /** 내가 가입한 팀 목록 (최대 3개) */
+    /** 내가 가입한 팀 목록 (team_members + players 기준, 최대 3개) */
     public List<TeamSummaryResponse> getMyTeams(User currentUser) {
-        var memberships = teamMemberRepository.findActiveTeamsByUserId(currentUser.getId());
+        // team_members 기준 팀 ID 목록
+        var teamIdsFromMembers = teamMemberRepository.findActiveTeamsByUserId(currentUser.getId())
+                .stream()
+                .map(tm -> tm.getTeam().getId())
+                .collect(Collectors.toSet());
 
-        return memberships.stream()
-                .map(TeamMember::getTeam)
+        // players 기준 팀 ID 목록
+        var teamIdsFromPlayers = playerRepository.findByUserIdAndIsActiveTrue(currentUser.getId())
+                .stream()
+                .map(p -> p.getTeam().getId())
+                .collect(Collectors.toSet());
+
+        // 합집합
+        Set<Long> allTeamIds = new HashSet<>();
+        allTeamIds.addAll(teamIdsFromMembers);
+        allTeamIds.addAll(teamIdsFromPlayers);
+
+        // 실제 팀 조회 및 응답 매핑
+        return allTeamIds.stream()
+                .map(teamRepository::findById)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .limit(3)
                 .map(team -> {
                     long memberCount = teamMemberRepository.countByTeamIdAndLeftAtIsNull(team.getId());
-                    return new TeamSummaryResponse(
-                            team,
-                            team.getEmblemUrl(),
-                            team.getOwnerUser() != null && team.getOwnerUser().getId().equals(currentUser.getId()),
-                            memberCount
-                    );
+                    boolean isOwner = team.getOwnerUser() != null &&
+                            team.getOwnerUser().getId().equals(currentUser.getId());
+                    return new TeamSummaryResponse(team, team.getEmblemUrl(), isOwner, memberCount);
                 })
                 .toList();
     }
