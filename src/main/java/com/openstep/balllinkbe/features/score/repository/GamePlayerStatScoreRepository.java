@@ -34,4 +34,6 @@ public interface GamePlayerStatScoreRepository extends JpaRepository<GamePlayerS
                         @Param("playerId") Long playerId);
 
     Optional<GamePlayerStat> findByGameAndPlayer(Game game, Player player);
+
+    Optional<GamePlayerStat> findByGameAndPlayerId(Game game, Long playerId);
 }

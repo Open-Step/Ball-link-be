@@ -47,6 +47,6 @@ public class GameEvent {
         CLOCK_UPDATE, SHOTCLOCK_RESET,
         NOTE,
         POSSESSION_CHANGE,
-        GAME_FINISH
+        REBOUND, GAME_FINISH
     }
 }

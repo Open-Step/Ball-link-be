@@ -1,5 +1,6 @@
 package com.openstep.balllinkbe.features.team_manage.repository;
 
+import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.team.Player;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -18,5 +19,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     Optional<Player> findByTeamIdAndUserId(Long teamId, Long userId);
     List<Player> findByUserIdAndIsActiveTrue(Long userId);
-
+    Optional<Player> findByTeam_IdAndNumber(Long teamId, Integer number);
+    Optional<Player> findByTeamIdAndNumberAndIsActiveTrue(Long id, Short num);
 }
