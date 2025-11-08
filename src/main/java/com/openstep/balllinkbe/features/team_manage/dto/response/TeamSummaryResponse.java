@@ -16,6 +16,7 @@ public class TeamSummaryResponse {
     private final boolean isOwner;
     private final LocalDate foundedAt;
     private final long memberCount;
+    private final String description; // 추가
 
     public TeamSummaryResponse(Team team, String cdnUrl, boolean isOwner, long memberCount) {
         this.id = team.getId();
@@ -27,5 +28,6 @@ public class TeamSummaryResponse {
         this.isOwner = isOwner;
         this.foundedAt = team.getFoundedAt();
         this.memberCount = memberCount;
+        this.description = team.getDescription(); // 추가
     }
 }

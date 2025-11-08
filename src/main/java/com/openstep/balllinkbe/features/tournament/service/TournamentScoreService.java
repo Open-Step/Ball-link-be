@@ -62,28 +62,29 @@ public class TournamentScoreService {
     @Transactional
     public String createScoreSession(Long tournamentId, Long gameId, User currentUser) {
         var existing = scoreSessionRepository.findByGameId(gameId);
-        if (existing.isPresent()) return existing.get().getToken();
+        if (existing.isPresent()) return existing.get().getSessionToken(); // ✅ getToken → getSessionToken
 
         var session = ScoreSession.builder()
                 .gameId(gameId)
-                .tournamentId(tournamentId)
                 .createdBy(currentUser)
-                .token("T-" + gameId + "-" + System.currentTimeMillis())
+                .sessionToken("T-" + gameId + "-" + System.currentTimeMillis()) // ✅ token → sessionToken
                 .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusHours(6)) // ✅ endedAt → expiresAt (예시로 6시간 후 만료)
                 .build();
 
         scoreSessionRepository.save(session);
-        return session.getToken();
+        return session.getSessionToken(); // ✅ getToken → getSessionToken
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> getScoreSession(Long tournamentId, Long gameId) {
         var session = scoreSessionRepository.findByGameId(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
+
         return Map.of(
-                "token", session.getToken(),
+                "token", session.getSessionToken(), // ✅ getToken → getSessionToken
                 "createdAt", session.getCreatedAt(),
-                "isActive", session.getEndedAt() == null
+                "isActive", session.getExpiresAt() == null || session.getExpiresAt().isAfter(LocalDateTime.now()) // ✅ endedAt → expiresAt
         );
     }
 
@@ -91,7 +92,7 @@ public class TournamentScoreService {
     public void endGame(Long tournamentId, Long gameId, User currentUser) {
         var session = scoreSessionRepository.findByGameId(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
-        session.setEndedAt(LocalDateTime.now());
+        session.setExpiresAt(LocalDateTime.now()); // ✅ setEndedAt → setExpiresAt
         scoreSessionRepository.save(session);
 
         var game = gameRepository.findById(gameId)
@@ -100,6 +101,7 @@ public class TournamentScoreService {
         game.setFinishedAt(LocalDateTime.now());
         gameRepository.save(game);
     }
+
 
     private void removeEntriesForTeams(Long tournamentId, Game game) {
         var all = tournamentEntryRepository.findByTournamentId(tournamentId);
