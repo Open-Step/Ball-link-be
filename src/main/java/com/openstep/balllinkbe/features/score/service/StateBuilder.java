@@ -2,6 +2,7 @@ package com.openstep.balllinkbe.features.score.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openstep.balllinkbe.domain.game.Game;
+import com.openstep.balllinkbe.domain.game.GameEvent;
 import com.openstep.balllinkbe.domain.game.GamePlayerStat;
 import com.openstep.balllinkbe.domain.game.GameTeamStat;
 import com.openstep.balllinkbe.domain.team.Team;
@@ -15,8 +16,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.util.Map.entry;
 
 @Slf4j
 @Service
@@ -33,8 +32,10 @@ public class StateBuilder {
     public Map<String, Object> buildSyncState(Long gameId) {
         Game game = em.find(Game.class, gameId);
         if (game == null) {
-            log.warn("⚠️ Game not found: {}", gameId);
-            return Map.of("type", "error", "message", "Game not found");
+            Map<String, Object> err = new HashMap<>();
+            err.put("type", "error");
+            err.put("message", "Game not found");
+            return err;
         }
 
         Team home = game.getHomeTeam();
@@ -69,81 +70,89 @@ public class StateBuilder {
         // 📊 쿼터별 점수
         Map<Integer, Integer> quarterScores = getQuarterScores(gameId);
 
-        // 🧩 최종 구조
-        return Map.ofEntries(
-                entry("type", "state"),
-                entry("action", "state.sync"),
-                entry("data", Map.ofEntries(
-                        entry("gameId", game.getId()),
-                        entry("period", game.getStartedAt() != null ? getCurrentPeriod(gameId) : 0),
-                        entry("home", Map.ofEntries(
-                                entry("teamId", home.getId()),
-                                entry("teamName", home.getName()),
-                                entry("stat", homeStat),
-                                entry("players", homePlayers)
-                        )),
-                        entry("away", Map.ofEntries(
-                                entry("teamId", away.getId()),
-                                entry("teamName", away.getName()),
-                                entry("stat", awayStat),
-                                entry("players", awayPlayers)
-                        )),
-                        entry("clock", clock),
-                        entry("quarters", quarterScores)
-                ))
-        );
+        // 🧩 최종 구조 (Null 안전 HashMap)
+        Map<String, Object> homeBlock = new HashMap<>();
+        homeBlock.put("teamId", home.getId());
+        homeBlock.put("teamName", home.getName());
+        homeBlock.put("stat", homeStat);
+        homeBlock.put("players", homePlayers);
+
+        Map<String, Object> awayBlock = new HashMap<>();
+        awayBlock.put("teamId", away.getId());
+        awayBlock.put("teamName", away.getName());
+        awayBlock.put("stat", awayStat);
+        awayBlock.put("players", awayPlayers);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("gameId", game.getId());
+        data.put("period", game.getStartedAt() != null ? getCurrentPeriod(gameId) : 0);
+        data.put("home", homeBlock);
+        data.put("away", awayBlock);
+        data.put("clock", clock);
+        data.put("quarters", quarterScores);
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("type", "state");
+        out.put("action", "state.sync");
+        out.put("data", data);
+
+        return out;
     }
 
     /* ====== Helper Methods ====== */
 
-    /** ✅ 팀 스탯 변환 */
+    /** ✅ 팀 스탯 변환 (Null 안전) */
     private Map<String, Object> toTeamStat(List<GameTeamStat> stats, Long teamId) {
         return stats.stream()
                 .filter(s -> s.getTeam().getId().equals(teamId))
                 .findFirst()
-                .map(s -> Map.ofEntries(
-                        entry("pts", s.getPts()),
-                        entry("reb", s.getReb()),
-                        entry("ast", s.getAst()),
-                        entry("pf", s.getPf()),
-                        entry("stl", s.getStl()),
-                        entry("blk", s.getBlk()),
-                        entry("tov", s.getTov())
-                ))
-                .map(m -> (Map<String, Object>)(Map<?, ?>) m) // ✅ 추가된 부분
-                .orElseGet(Map::of);
+                .map(s -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("pts", s.getPts());
+                    m.put("reb", s.getReb());
+                    m.put("ast", s.getAst());
+                    m.put("pf", s.getPf());
+                    m.put("stl", s.getStl());
+                    m.put("blk", s.getBlk());
+                    m.put("tov", s.getTov());
+                    return m;
+                })
+                .orElseGet(HashMap::new);
     }
 
-
-    /** ✅ 선수 스탯 변환 */
+    /** ✅ 선수 스탯 변환 (Null 안전) */
     private Map<String, Object> toPlayerStat(GamePlayerStat p) {
-        return Map.ofEntries(
-                entry("playerId", p.getPlayer().getId()),
-                entry("name", p.getPlayer().getName()),
-                entry("number", p.getPlayer().getNumber()),
-                entry("position", p.getPlayer().getPosition() != null ? p.getPlayer().getPosition().name() : null),
-                entry("pts", p.getPts()),
-                entry("reb", p.getReb()),
-                entry("ast", p.getAst()),
-                entry("stl", p.getStl()),
-                entry("blk", p.getBlk()),
-                entry("pf", p.getPf()),
-                entry("tov", p.getTov())
-        );
+        Map<String, Object> m = new HashMap<>();
+        m.put("playerId", p.getPlayer().getId());
+        m.put("name", p.getPlayer().getName());
+        m.put("number", p.getPlayer().getNumber());
+        m.put("position", p.getPlayer().getPosition() != null ? p.getPlayer().getPosition().name() : null);
+        m.put("pts", p.getPts());
+        m.put("reb", p.getReb());
+        m.put("ast", p.getAst());
+        m.put("stl", p.getStl());
+        m.put("blk", p.getBlk());
+        m.put("pf", p.getPf());
+        m.put("tov", p.getTov());
+        return m;
     }
 
-    /** ✅ 최근 클락 이벤트 조회 */
+    /** ✅ 최근 클락 이벤트 조회 (Null 안전) */
     private Map<String, Object> getLatestClock(Long gameId) {
         return eventRepo.findLatestClockEvent(gameId)
-                .map(ev -> Map.<String, Object>of(
-                        "running", true,
-                        "timeRemaining", ev.getClockTime(),
-                        "updatedAt", ev.getTs()
-                ))
-                .orElseGet(() -> Map.<String, Object>of(
-                        "running", false,
-                        "timeRemaining", "10:00"
-                ));
+                .map(ev -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("running", true);
+                    m.put("timeRemaining", ev.getClockTime());
+                    m.put("updatedAt", ev.getTs());
+                    return m;
+                })
+                .orElseGet(() -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("running", false);
+                    m.put("timeRemaining", "10:00");
+                    return m;
+                });
     }
 
     /** ✅ 쿼터별 점수 */
@@ -159,7 +168,9 @@ public class StateBuilder {
             return out;
         } catch (Exception e) {
             log.warn("⚠️ Quarter score query failed: {}", e.getMessage());
-            return Map.of(1, 0, 2, 0, 3, 0, 4, 0);
+            Map<Integer, Integer> fallback = new LinkedHashMap<>();
+            fallback.put(1, 0); fallback.put(2, 0); fallback.put(3, 0); fallback.put(4, 0);
+            return fallback;
         }
     }
 
@@ -167,7 +178,7 @@ public class StateBuilder {
     private int getCurrentPeriod(Long gameId) {
         try {
             return eventRepo.findLastStartedPeriod(gameId)
-                    .map(GameEvent -> GameEvent.getPeriod())
+                    .map(GameEvent::getPeriod)
                     .orElse(1);
         } catch (Exception e) {
             log.warn("⚠️ getCurrentPeriod failed: {}", e.getMessage());
