@@ -20,6 +20,7 @@ public class ScoreStompController {
     private final GameCommandService commandService;
     private final IdempotencyCache idempotencyCache;
 
+    /** ✅ 클라이언트 → /app/games.{gameId}.cmd */
     @MessageMapping("/games.{gameId}.cmd")
     public void handleCommand(
             @DestinationVariable Long gameId,
@@ -49,7 +50,7 @@ public class ScoreStompController {
             // 실제 명령 처리
             GameResult result = commandService.handleCommand(gameId, message);
 
-            // ACK 전송 (null-safe)
+            // ACK 전송
             Map<String, Object> ack = new HashMap<>();
             ack.put("type", "ack");
             ack.put("action", action);
@@ -78,7 +79,6 @@ public class ScoreStompController {
             }
 
         } catch (Exception e) {
-            // 에러 응답도 null-safe
             Map<String, Object> err = new HashMap<>();
             err.put("type", "error");
             err.put("action", action);

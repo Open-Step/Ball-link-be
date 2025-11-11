@@ -136,11 +136,17 @@ public class TeamMemberService {
             throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER);
         }
 
-        // 팀원 탈퇴 처리
+        // 이미 탈퇴 처리된 경우 중복 강퇴 방지
+        if (target.getLeftAt() != null) {
+            throw new CustomException(ErrorCode.ALREADY_LEFT);
+        }
+
+        // 팀원 논리적 탈퇴 처리
         target.setLeftAt(LocalDateTime.now());
+        target.setRole(null); // 필요 시 권한 제거 (선택)
         teamMemberRepository.save(target);
 
-        // 플레이어 엔티티도 비활성화 (같은 유저가 등록된 경우)
+        // 플레이어 엔티티 soft delete (같은 유저가 선수로 등록된 경우)
         playerRepository.findByTeamIdAndUserId(teamId, userId)
                 .ifPresent(player -> {
                     player.setDeletedAt(LocalDateTime.now());
@@ -148,4 +154,5 @@ public class TeamMemberService {
                     playerRepository.save(player);
                 });
     }
+
 }
