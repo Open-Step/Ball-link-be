@@ -62,18 +62,18 @@ public class TournamentScoreService {
     @Transactional
     public String createScoreSession(Long tournamentId, Long gameId, User currentUser) {
         var existing = scoreSessionRepository.findByGameId(gameId);
-        if (existing.isPresent()) return existing.get().getSessionToken(); // ✅ getToken → getSessionToken
+        if (existing.isPresent()) return existing.get().getSessionToken();
 
         var session = ScoreSession.builder()
                 .gameId(gameId)
                 .createdBy(currentUser)
-                .sessionToken("T-" + gameId + "-" + System.currentTimeMillis()) // ✅ token → sessionToken
+                .sessionToken("T-" + gameId + "-" + System.currentTimeMillis())
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusHours(6)) // ✅ endedAt → expiresAt (예시로 6시간 후 만료)
+                .expiresAt(null)   // ACTIVE 상태로 인식되도록 변경
                 .build();
 
         scoreSessionRepository.save(session);
-        return session.getSessionToken(); // ✅ getToken → getSessionToken
+        return session.getSessionToken();
     }
 
     @Transactional(readOnly = true)
