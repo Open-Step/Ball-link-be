@@ -1,8 +1,10 @@
 package com.openstep.balllinkbe.features.scrimmage.service;
 
 import com.openstep.balllinkbe.domain.game.Game;
+import com.openstep.balllinkbe.domain.score.ScoreSession;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.score.repository.ScoreSessionRepository;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.*;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.InitiateScrimmageResponse;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
@@ -10,9 +12,9 @@ import com.openstep.balllinkbe.global.exception.CustomException;
 import com.openstep.balllinkbe.global.exception.ErrorCode;
 import com.openstep.balllinkbe.features.team_manage.repository.TeamRepository;
 import com.openstep.balllinkbe.features.game.repository.GameRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +27,7 @@ public class ScrimmageService {
 
     private final TeamRepository teamRepository;
     private final GameRepository gameRepository;
-
+    private final ScoreSessionRepository scoreSessionRepository;
     // 인메모리 라인업 저장 (DB 영향 없이)
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
 
@@ -148,14 +150,39 @@ public class ScrimmageService {
     }
 
     /** 스코어 세션 생성 */
+    @Transactional
     public String createScoreSession(Long gameId, User currentUser) {
-        return "SCR-" + gameId + "-" + System.currentTimeMillis();
+        var existing = scoreSessionRepository.findByGameId(gameId);
+        if (existing.isPresent()) {
+            return existing.get().getSessionToken();
+        }
+
+        var session = ScoreSession.builder()
+                .gameId(gameId)
+                .createdBy(currentUser)
+                .sessionToken("SCR-" + gameId + "-" + System.currentTimeMillis())
+                .createdAt(LocalDateTime.now())
+                .expiresAt(LocalDateTime.now().plusHours(6))
+                .build();
+
+        scoreSessionRepository.save(session);
+        return session.getSessionToken();
     }
 
+
     /** 스코어 세션 조회 */
+    @Transactional(readOnly = true)
     public Map<String, Object> getScoreSession(Long gameId) {
-        return Map.of("active", true, "gameId", gameId);
+        var session = scoreSessionRepository.findByGameId(gameId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
+
+        return Map.of(
+                "token", session.getSessionToken(),
+                "createdAt", session.getCreatedAt(),
+                "isActive", session.getExpiresAt().isAfter(LocalDateTime.now())
+        );
     }
+
 
     /** 종료 */
     @Transactional
