@@ -162,12 +162,13 @@ public class ScrimmageService {
                 .createdBy(currentUser)
                 .sessionToken("SCR-" + gameId + "-" + System.currentTimeMillis())
                 .createdAt(LocalDateTime.now())
-                .expiresAt(LocalDateTime.now().plusHours(6))
+                .expiresAt(null) // 🔥 ACTIVE 로 인식되도록 설정
                 .build();
 
         scoreSessionRepository.save(session);
         return session.getSessionToken();
     }
+
 
 
     /** 스코어 세션 조회 */

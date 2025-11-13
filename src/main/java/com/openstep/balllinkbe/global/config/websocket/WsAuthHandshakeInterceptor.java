@@ -3,6 +3,7 @@ package com.openstep.balllinkbe.global.config.websocket;
 import com.openstep.balllinkbe.features.score.repository.ScoreSessionRepository;
 import com.openstep.balllinkbe.global.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import java.security.Principal;
 
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
@@ -69,6 +71,12 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
                 scoreSession.getCreatedBy().getId().equals(userId))
                 ? "CONTROLLER"
                 : "VIEWER";
+
+        log.info("[WS-CONNECT] userId={}, gameId={}, sessionToken={}, role={}",
+                userId,
+                gameId,
+                sessionToken,
+                role);
 
         attributes.put("gameId", gameId);
         attributes.put("userId", userId);
