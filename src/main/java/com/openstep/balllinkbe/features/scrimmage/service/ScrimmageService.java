@@ -202,12 +202,19 @@ public class ScrimmageService {
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
 
-        var lineup = guestMap.getOrDefault(gameId, List.of());
-        var home = lineup.stream()
-                .filter(p -> "HOME".equalsIgnoreCase(p.getTeamSide()))
+        // 🔥 DB 라인업 조회
+        List<GameLineupPlayer> dbLineup = lineupRepo.findByGameId(gameId);
+
+        // HOME
+        var home = dbLineup.stream()
+                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.HOME)
+                .map(this::convertLineup)
                 .toList();
-        var away = lineup.stream()
-                .filter(p -> "AWAY".equalsIgnoreCase(p.getTeamSide()))
+
+        // AWAY
+        var away = dbLineup.stream()
+                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.AWAY)
+                .map(this::convertLineup)
                 .toList();
 
         return ScrimmageDetailResponse.builder()
@@ -221,6 +228,30 @@ public class ScrimmageService {
                 .awayLineup(away)
                 .build();
     }
+
+    /** GameLineupPlayer → ScrimmageDetailResponse.PlayerLineup 변환 */
+    private ScrimmageDetailResponse.PlayerLineup convertLineup(GameLineupPlayer p) {
+        boolean isGuest = (p.getPlayer() == null);
+
+        // Short → Integer 변환
+        Integer number = null;
+        if (isGuest) {
+            number = p.getGuestNumber() != null ? p.getGuestNumber().intValue() : null;
+        } else {
+            number = p.getNumber() != null ? p.getNumber().intValue() : null;
+        }
+
+        return ScrimmageDetailResponse.PlayerLineup.builder()
+                .playerId(isGuest ? null : p.getPlayer().getId())
+                .name(isGuest ? p.getGuestName() : p.getPlayer().getName())
+                .number(number)  // ← Integer로 변환된 값
+                .position(p.getPosition() != null ? p.getPosition().name() : null)
+                .starter(p.isStarter())
+                .guest(isGuest)
+                .teamSide(p.getTeamSide().name())
+                .build();
+    }
+
 
     /** 스코어 세션 생성 */
     @Transactional
