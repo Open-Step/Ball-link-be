@@ -1,13 +1,18 @@
 package com.openstep.balllinkbe.features.scrimmage.service;
 
 import com.openstep.balllinkbe.domain.game.Game;
+import com.openstep.balllinkbe.domain.game.GameLineupPlayer;
 import com.openstep.balllinkbe.domain.score.ScoreSession;
+import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
+import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.domain.user.User;
 import com.openstep.balllinkbe.features.score.repository.ScoreSessionRepository;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.*;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.InitiateScrimmageResponse;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
+import com.openstep.balllinkbe.features.team_manage.repository.PlayerRepository;
+import com.openstep.balllinkbe.features.tournament.repository.GameLineupPlayerRepository;
 import com.openstep.balllinkbe.global.exception.CustomException;
 import com.openstep.balllinkbe.global.exception.ErrorCode;
 import com.openstep.balllinkbe.features.team_manage.repository.TeamRepository;
@@ -17,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,6 +34,9 @@ public class ScrimmageService {
     private final TeamRepository teamRepository;
     private final GameRepository gameRepository;
     private final ScoreSessionRepository scoreSessionRepository;
+    private final GameLineupPlayerRepository lineupRepo;
+    private final PlayerRepository playerRepo; // 선수 엔티티 필요
+
     // 인메모리 라인업 저장 (DB 영향 없이)
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
 
@@ -53,39 +62,91 @@ public class ScrimmageService {
     /** 라인업 저장 */
     @Transactional
     public void saveEntries(Long gameId, AddEntryRequest req, User currentUser) {
-        var all = new java.util.ArrayList<ScrimmageDetailResponse.PlayerLineup>();
 
-        // 홈팀
+        // 기존 라인업 삭제
+        lineupRepo.deleteByGameId(gameId);
+
+        Game game = gameRepository.getReferenceById(gameId);
+
+        var list = new ArrayList<GameLineupPlayer>();
+
+        // HOME
         if (req.getHomePlayers() != null) {
-            for (var e : req.getHomePlayers()) {
-                all.add(ScrimmageDetailResponse.PlayerLineup.builder()
-                        .playerId(e.getPlayerId())
-                        .name(e.getName())
-                        .number(e.getNumber())
-                        .position(e.getPosition())
-                        .starter(e.isStarter())
-                        .guest(e.getPlayerId() == null)
-                        .teamSide("HOME")
+            for (var p : req.getHomePlayers()) {
+
+                Player player;
+
+                if (p.getPlayerId() != null) {
+                    // 기존 팀 선수
+                    player = playerRepo.getReferenceById(p.getPlayerId());
+                } else {
+                    // 게스트 선수 → 새로운 Player 엔티티 생성
+                    player = Player.builder()
+                            .team(game.getHomeTeam())
+                            .name(p.getName())
+                            .number(
+                                    p.getPlayerId() != null && p.getNumber() != null
+                                            ? p.getNumber().shortValue()
+                                            : null
+                            )
+                            .isActive(true)
+                            .position(p.getPosition() != null
+                                    ? Position.valueOf(p.getPosition().toUpperCase())
+                                    : null)
+                            .build();
+                    playerRepo.save(player);
+                }
+
+                list.add(GameLineupPlayer.builder()
+                        .game(game)
+                        .team(game.getHomeTeam())
+                        .teamSide(GameLineupPlayer.Side.HOME)
+                        .player(player)
+                        .number(player.getNumber())
+                        .position(player.getPosition())
+                        .isStarter(p.isStarter())
                         .build());
             }
         }
 
-        // 어웨이팀
+        // AWAY
         if (req.getAwayPlayers() != null) {
-            for (var e : req.getAwayPlayers()) {
-                all.add(ScrimmageDetailResponse.PlayerLineup.builder()
-                        .playerId(e.getPlayerId())
-                        .name(e.getName())
-                        .number(e.getNumber())
-                        .position(e.getPosition())
-                        .starter(e.isStarter())
-                        .guest(e.getPlayerId() == null)
-                        .teamSide("AWAY")
+            for (var p : req.getAwayPlayers()) {
+
+                Player player;
+
+                if (p.getPlayerId() != null) {
+                    player = playerRepo.getReferenceById(p.getPlayerId());
+                } else {
+                    player = Player.builder()
+                            .team(game.getAwayTeam())
+                            .name(p.getName())
+                            .number(
+                                    p.getPlayerId() != null && p.getNumber() != null
+                                            ? p.getNumber().shortValue()
+                                            : null
+                            )
+                            .isActive(true)
+                            .position(p.getPosition() != null
+                                    ? Position.valueOf(p.getPosition().toUpperCase())
+                                    : null)
+                            .build();
+                    playerRepo.save(player);
+                }
+
+                list.add(GameLineupPlayer.builder()
+                        .game(game)
+                        .team(game.getAwayTeam())
+                        .teamSide(GameLineupPlayer.Side.AWAY)
+                        .player(player)
+                        .number(player.getNumber())
+                        .position(player.getPosition())
+                        .isStarter(p.isStarter())
                         .build());
             }
         }
 
-        guestMap.put(gameId, all);
+        lineupRepo.saveAll(list);
     }
 
     /** 자체전 생성 */

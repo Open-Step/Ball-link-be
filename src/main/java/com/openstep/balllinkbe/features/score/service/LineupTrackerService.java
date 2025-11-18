@@ -20,7 +20,7 @@ import java.util.*;
 public class LineupTrackerService {
 
     private final EntityManager em;
-    private final GamePlayerStatScoreRepository statRepo; // ✅ 변경됨
+    private final GamePlayerStatScoreRepository statRepo; // 변경됨
 
     private final Map<Long, Map<Long, LocalDateTime>> onCourtMap = new HashMap<>();
     private final Map<Long, Map<Long, Duration>> totalPlayMap = new HashMap<>();
