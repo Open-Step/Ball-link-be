@@ -133,42 +133,36 @@ public class StateBuilder {
         List<GameLineupPlayer> lineup = lineupRepo.findByGameId(gameId);
 
         var homePlayers = lineup.stream()
-                .filter(p -> p.getTeamSide().name().equalsIgnoreCase("HOME"))
+                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.HOME)
                 .map(this::toScrimmagePlayer)
                 .toList();
 
         var awayPlayers = lineup.stream()
-                .filter(p -> p.getTeamSide().name().equalsIgnoreCase("AWAY"))
+                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.AWAY)
                 .map(this::toScrimmagePlayer)
                 .toList();
 
-        // 팀 스탯 = 0 초기화
-        Map<String, Object> zeroStat = Map.of(
-                "pts", 0,
-                "reb", 0,
-                "ast", 0,
-                "pf", 0,
-                "stl", 0,
-                "blk", 0,
-                "tov", 0
-        );
+        // 각각 새로운 객체로 생성해야 한다
+        Map<String, Object> homeStat = new HashMap<>();
+        Map<String, Object> awayStat = new HashMap<>();
+        initZeroStat(homeStat);
+        initZeroStat(awayStat);
 
         Map<String, Object> homeBlock = new HashMap<>();
         homeBlock.put("teamId", game.getHomeTeam().getId());
         homeBlock.put("teamName", game.getHomeTeam().getName());
-        homeBlock.put("stat", zeroStat);
+        homeBlock.put("stat", homeStat);       // ✔ 서로 다른 객체
         homeBlock.put("players", homePlayers);
 
         Map<String, Object> awayBlock = new HashMap<>();
         awayBlock.put("teamId", game.getAwayTeam().getId());
         awayBlock.put("teamName", game.getAwayTeam().getName());
-        homeBlock.put("stat", zeroStat);
-        awayBlock.put("stat", zeroStat);
+        awayBlock.put("stat", awayStat);       // ✔ 서로 다른 객체
         awayBlock.put("players", awayPlayers);
 
         Map<String, Object> data = new HashMap<>();
         data.put("gameId", gameId);
-        data.put("period", 1); // 스크리미지는 기본 1쿼터부터 시작
+        data.put("period", 1);
         data.put("home", homeBlock);
         data.put("away", awayBlock);
         data.put("clock", Map.of("running", false, "timeRemaining", "10:00"));
@@ -180,6 +174,16 @@ public class StateBuilder {
         out.put("data", data);
 
         return out;
+    }
+
+    private void initZeroStat(Map<String, Object> stat) {
+        stat.put("pts", 0);
+        stat.put("reb", 0);
+        stat.put("ast", 0);
+        stat.put("pf", 0);
+        stat.put("stl", 0);
+        stat.put("blk", 0);
+        stat.put("tov", 0);
     }
 
     /** 스크리미지용 선수 변환 */
