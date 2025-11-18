@@ -195,4 +195,8 @@ public class ScrimmageService {
         game.setState(Game.State.FINISHED);
         game.setFinishedAt(LocalDateTime.now());
     }
+    public List<ScrimmageDetailResponse.PlayerLineup> getLineupRaw(Long gameId) {
+        return guestMap.getOrDefault(gameId, List.of());
+    }
+
 }

@@ -9,6 +9,8 @@ import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.features.score.repository.GameEventRepository;
 import com.openstep.balllinkbe.features.score.repository.GamePlayerStatScoreRepository;
 import com.openstep.balllinkbe.features.score.repository.GameTeamStatScoreRepository;
+import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
+import com.openstep.balllinkbe.features.scrimmage.service.ScrimmageService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +30,10 @@ public class StateBuilder {
     private final GameEventRepository eventRepo;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    /** ✅ 경기 전체 상태 스냅샷 생성 */
+    // 스크리미지 라인업 조회용
+    private final ScrimmageService scrimmageService;
+
+    /** 경기 전체 상태 스냅샷 생성 */
     public Map<String, Object> buildSyncState(Long gameId) {
         Game game = em.find(Game.class, gameId);
         if (game == null) {
@@ -38,20 +43,26 @@ public class StateBuilder {
             return err;
         }
 
+        // 스크리미지면 별도 빌더 사용
+        if (game.isScrimmage()) {
+            return buildScrimmageState(game);
+        }
+
+        // 일반 토너먼트/리그 경기
         Team home = game.getHomeTeam();
         Team away = game.getAwayTeam();
 
-        // 🏀 팀 스탯
+        // 팀 스탯
         List<GameTeamStat> teamStats = teamRepo.findAll().stream()
-                .filter(t -> Objects.equals(t.getGame().getId(), gameId))
+                .filter(t -> Objects.equals(t.getGame().getId(), game.getId()))
                 .toList();
 
         Map<String, Object> homeStat = toTeamStat(teamStats, home.getId());
         Map<String, Object> awayStat = toTeamStat(teamStats, away.getId());
 
-        // 👥 선수별 스탯
+        // 선수별 스탯
         List<GamePlayerStat> playerStats = playerRepo.findAll().stream()
-                .filter(p -> Objects.equals(p.getGame().getId(), gameId))
+                .filter(p -> Objects.equals(p.getGame().getId(), game.getId()))
                 .toList();
 
         List<Map<String, Object>> homePlayers = playerStats.stream()
@@ -64,13 +75,13 @@ public class StateBuilder {
                 .map(this::toPlayerStat)
                 .collect(Collectors.toList());
 
-        // ⏱ 최근 클락 이벤트
-        Map<String, Object> clock = getLatestClock(gameId);
+        // 최근 클락 이벤트
+        Map<String, Object> clock = getLatestClock(game.getId());
 
-        // 📊 쿼터별 점수
-        Map<Integer, Integer> quarterScores = getQuarterScores(gameId);
+        // 쿼터별 점수
+        Map<Integer, Integer> quarterScores = getQuarterScores(game.getId());
 
-        // 🧩 최종 구조 (Null 안전 HashMap)
+        // 최종 구조
         Map<String, Object> homeBlock = new HashMap<>();
         homeBlock.put("teamId", home.getId());
         homeBlock.put("teamName", home.getName());
@@ -85,7 +96,7 @@ public class StateBuilder {
 
         Map<String, Object> data = new HashMap<>();
         data.put("gameId", game.getId());
-        data.put("period", game.getStartedAt() != null ? getCurrentPeriod(gameId) : 0);
+        data.put("period", game.getStartedAt() != null ? getCurrentPeriod(game.getId()) : 0);
         data.put("home", homeBlock);
         data.put("away", awayBlock);
         data.put("clock", clock);
@@ -99,9 +110,83 @@ public class StateBuilder {
         return out;
     }
 
-    /* ====== Helper Methods ====== */
+    /** 스크리미지 전용 상태 생성 */
+    private Map<String, Object> buildScrimmageState(Game game) {
+        Long gameId = game.getId();
 
-    /** ✅ 팀 스탯 변환 (Null 안전) */
+        // 인메모리 라인업 불러오기
+        List<ScrimmageDetailResponse.PlayerLineup> lineup =
+                scrimmageService.getLineupRaw(gameId);
+
+        var homePlayers = lineup.stream()
+                .filter(p -> "HOME".equalsIgnoreCase(p.getTeamSide()))
+                .map(this::toScrimmagePlayer)
+                .toList();
+
+        var awayPlayers = lineup.stream()
+                .filter(p -> "AWAY".equalsIgnoreCase(p.getTeamSide()))
+                .map(this::toScrimmagePlayer)
+                .toList();
+
+        // 팀 스탯 = 0 초기화
+        Map<String, Object> zeroStat = Map.of(
+                "pts", 0,
+                "reb", 0,
+                "ast", 0,
+                "pf", 0,
+                "stl", 0,
+                "blk", 0,
+                "tov", 0
+        );
+
+        Map<String, Object> homeBlock = new HashMap<>();
+        homeBlock.put("teamId", game.getHomeTeam().getId());
+        homeBlock.put("teamName", game.getHomeTeam().getName());
+        homeBlock.put("stat", zeroStat);
+        homeBlock.put("players", homePlayers);
+
+        Map<String, Object> awayBlock = new HashMap<>();
+        awayBlock.put("teamId", game.getAwayTeam().getId());
+        awayBlock.put("teamName", game.getAwayTeam().getName());
+        homeBlock.put("stat", zeroStat);
+        awayBlock.put("stat", zeroStat);
+        awayBlock.put("players", awayPlayers);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("gameId", gameId);
+        data.put("period", 1); // 스크리미지는 기본 1쿼터부터 시작
+        data.put("home", homeBlock);
+        data.put("away", awayBlock);
+        data.put("clock", Map.of("running", false, "timeRemaining", "10:00"));
+        data.put("quarters", Map.of(1, 0, 2, 0, 3, 0, 4, 0));
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("type", "state");
+        out.put("action", "state.sync");
+        out.put("data", data);
+
+        return out;
+    }
+
+    /** 스크리미지용 선수 변환 */
+    private Map<String, Object> toScrimmagePlayer(ScrimmageDetailResponse.PlayerLineup p) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("playerId", p.getPlayerId());
+        m.put("name", p.getName());
+        m.put("number", p.getNumber());
+        m.put("position", p.getPosition());
+        // 스탯은 일단 0으로 시작, 진행 중에 StatAggregator 가 채워 넣을 수 있음
+        m.put("pts", 0);
+        m.put("reb", 0);
+        m.put("ast", 0);
+        m.put("stl", 0);
+        m.put("blk", 0);
+        m.put("pf", 0);
+        m.put("tov", 0);
+        return m;
+    }
+
+    /** 팀 스탯 변환 (Null 안전) */
     private Map<String, Object> toTeamStat(List<GameTeamStat> stats, Long teamId) {
         return stats.stream()
                 .filter(s -> s.getTeam().getId().equals(teamId))
@@ -120,7 +205,7 @@ public class StateBuilder {
                 .orElseGet(HashMap::new);
     }
 
-    /** ✅ 선수 스탯 변환 (Null 안전) */
+    /** 선수 스탯 변환 (Null 안전) */
     private Map<String, Object> toPlayerStat(GamePlayerStat p) {
         Map<String, Object> m = new HashMap<>();
         m.put("playerId", p.getPlayer().getId());
@@ -137,7 +222,7 @@ public class StateBuilder {
         return m;
     }
 
-    /** ✅ 최근 클락 이벤트 조회 (Null 안전) */
+    /** 최근 클락 이벤트 조회 (Null 안전) */
     private Map<String, Object> getLatestClock(Long gameId) {
         return eventRepo.findLatestClockEvent(gameId)
                 .map(ev -> {
@@ -155,7 +240,7 @@ public class StateBuilder {
                 });
     }
 
-    /** ✅ 쿼터별 점수 */
+    /** 쿼터별 점수 */
     private Map<Integer, Integer> getQuarterScores(Long gameId) {
         try {
             List<Map<String, Object>> rows = eventRepo.findQuarterScores(gameId);
@@ -167,21 +252,24 @@ public class StateBuilder {
             }
             return out;
         } catch (Exception e) {
-            log.warn("⚠️ Quarter score query failed: {}", e.getMessage());
+            log.warn("Quarter score query failed: {}", e.getMessage());
             Map<Integer, Integer> fallback = new LinkedHashMap<>();
-            fallback.put(1, 0); fallback.put(2, 0); fallback.put(3, 0); fallback.put(4, 0);
+            fallback.put(1, 0);
+            fallback.put(2, 0);
+            fallback.put(3, 0);
+            fallback.put(4, 0);
             return fallback;
         }
     }
 
-    /** ✅ 현재 쿼터 계산 */
+    /** 현재 쿼터 계산 */
     private int getCurrentPeriod(Long gameId) {
         try {
             return eventRepo.findLastStartedPeriod(gameId)
                     .map(GameEvent::getPeriod)
                     .orElse(1);
         } catch (Exception e) {
-            log.warn("⚠️ getCurrentPeriod failed: {}", e.getMessage());
+            log.warn("getCurrentPeriod failed: {}", e.getMessage());
             return 1;
         }
     }
