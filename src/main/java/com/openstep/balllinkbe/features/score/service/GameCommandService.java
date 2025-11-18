@@ -1,7 +1,9 @@
 package com.openstep.balllinkbe.features.score.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.game.GameEvent;
+import com.openstep.balllinkbe.features.game.repository.GameRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -22,6 +24,7 @@ public class GameCommandService {
     private final LineupTrackerService lineupTracker;
     private final PlayerResolver playerResolver;
     private final SimpMessagingTemplate messaging;
+    private final GameRepository gameRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Transactional
@@ -29,7 +32,7 @@ public class GameCommandService {
         String action = (String) message.get("action");
         Map<String, Object> raw = castToMap(message.get("data"));
 
-        // ✅ 등번호 기반 playerId 변환
+        // 등번호 기반 playerId 변환
         Map<String, Object> data = switch (action) {
             case "score.add", "foul.add", "rebound.add" -> playerResolver.enrichWithPlayerIds(gameId, raw);
             case "substitution" -> playerResolver.enrichSubstitution(gameId, raw);
@@ -82,7 +85,7 @@ public class GameCommandService {
 
             case "substitution" -> {
                 var ev = eventWriter.recordSubstitution(gameId, data);
-                lineupTracker.updateLineup(gameId, data); // ✅ 출전시간 처리
+                lineupTracker.updateLineup(gameId, data);
                 broadcastPbp(gameId, ev);
             }
 
@@ -110,7 +113,7 @@ public class GameCommandService {
                 broadcastPbp(gameId, ev);
             }
 
-            default -> log.warn("⚠️ Unknown action: {}", action);
+            default -> log.warn("⚠Unknown action: {}", action);
         }
         return result;
     }
@@ -121,11 +124,24 @@ public class GameCommandService {
         return mapper.convertValue(obj, Map.class);
     }
 
+    /**
+     * gameId 기준으로 topic 경로 결정
+     *  - scrimmage: /topic/scrimmages.{gameId}.public
+     *  - 일반 경기: /topic/games.{gameId}.public
+     */
+    private String topic(Long gameId) {
+        Game game = gameRepository.findById(gameId).orElse(null);
+        if (game != null && game.isScrimmage()) {
+            return "/topic/scrimmages." + gameId + ".public";
+        }
+        return "/topic/games." + gameId + ".public";
+    }
+
     private void broadcastPbp(Long gameId, GameEvent ev) {
         if (ev == null) return;
         var payload = eventWriter.toPbpEvent(ev);
-        messaging.convertAndSend("/topic/games." + gameId + ".public", payload);
-        log.debug("📢 pbp.append broadcasted: {}", payload);
+        messaging.convertAndSend(topic(gameId), payload);
+        log.debug("pbp.append broadcasted to {}: {}", topic(gameId), payload);
     }
 
     private void broadcastClockSync(Long gameId, Map<String, Object> data) {
@@ -139,6 +155,7 @@ public class GameCommandService {
         clock.put("shotRemaining", data.getOrDefault("shotRemaining", null));
 
         wrapper.put("data", clock);
-        messaging.convertAndSend("/topic/games." + gameId + ".public", wrapper);
+        messaging.convertAndSend(topic(gameId), wrapper);
+        log.debug("clock.sync broadcasted to {}: {}", topic(gameId), wrapper);
     }
 }
