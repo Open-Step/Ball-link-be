@@ -1,16 +1,14 @@
 package com.openstep.balllinkbe.features.score.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openstep.balllinkbe.domain.game.Game;
-import com.openstep.balllinkbe.domain.game.GameEvent;
-import com.openstep.balllinkbe.domain.game.GamePlayerStat;
-import com.openstep.balllinkbe.domain.game.GameTeamStat;
+import com.openstep.balllinkbe.domain.game.*;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.features.score.repository.GameEventRepository;
 import com.openstep.balllinkbe.features.score.repository.GamePlayerStatScoreRepository;
 import com.openstep.balllinkbe.features.score.repository.GameTeamStatScoreRepository;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
 import com.openstep.balllinkbe.features.scrimmage.service.ScrimmageService;
+import com.openstep.balllinkbe.features.tournament.repository.GameLineupPlayerRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +27,7 @@ public class StateBuilder {
     private final GamePlayerStatScoreRepository playerRepo;
     private final GameEventRepository eventRepo;
     private final ObjectMapper mapper = new ObjectMapper();
-
+    private final GameLineupPlayerRepository lineupRepo;
     // 스크리미지 라인업 조회용
     private final ScrimmageService scrimmageService;
 
@@ -110,21 +108,37 @@ public class StateBuilder {
         return out;
     }
 
+    private Map<String, Object> toScrimmagePlayer(GameLineupPlayer p) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("playerId", p.getPlayer() != null ? p.getPlayer().getId() : null);
+        m.put("name", p.getPlayer() != null ? p.getPlayer().getName() : p.getGuestName());
+        m.put("number", p.getPlayer() != null ? p.getNumber() : p.getGuestNumber());
+        m.put("position", p.getPosition() != null ? p.getPosition().name() : null);
+
+        // 스탯 초기값
+        m.put("pts", 0);
+        m.put("reb", 0);
+        m.put("ast", 0);
+        m.put("stl", 0);
+        m.put("blk", 0);
+        m.put("pf", 0);
+        m.put("tov", 0);
+        return m;
+    }
+
     /** 스크리미지 전용 상태 생성 */
     private Map<String, Object> buildScrimmageState(Game game) {
         Long gameId = game.getId();
 
-        // 인메모리 라인업 불러오기
-        List<ScrimmageDetailResponse.PlayerLineup> lineup =
-                scrimmageService.getLineupRaw(gameId);
+        List<GameLineupPlayer> lineup = lineupRepo.findByGameId(gameId);
 
         var homePlayers = lineup.stream()
-                .filter(p -> "HOME".equalsIgnoreCase(p.getTeamSide()))
+                .filter(p -> p.getTeamSide().name().equalsIgnoreCase("HOME"))
                 .map(this::toScrimmagePlayer)
                 .toList();
 
         var awayPlayers = lineup.stream()
-                .filter(p -> "AWAY".equalsIgnoreCase(p.getTeamSide()))
+                .filter(p -> p.getTeamSide().name().equalsIgnoreCase("AWAY"))
                 .map(this::toScrimmagePlayer)
                 .toList();
 
