@@ -90,9 +90,7 @@ public class ScrimmageService {
                                             : null
                             )
                             .isActive(true)
-                            .position(p.getPosition() != null
-                                    ? Position.valueOf(p.getPosition().toUpperCase())
-                                    : null)
+                            .position(parsePosition(p.getPosition()))
                             .build();
                     playerRepo.save(player);
                 }
@@ -127,9 +125,7 @@ public class ScrimmageService {
                                             : null
                             )
                             .isActive(true)
-                            .position(p.getPosition() != null
-                                    ? Position.valueOf(p.getPosition().toUpperCase())
-                                    : null)
+                            .position(parsePosition(p.getPosition()))
                             .build();
                     playerRepo.save(player);
                 }
@@ -148,6 +144,22 @@ public class ScrimmageService {
 
         lineupRepo.saveAll(list);
     }
+
+    private Position parsePosition(String pos) {
+        if (pos == null) return null;
+
+        // 공백/쓰레기 입력 방어
+        pos = pos.trim();
+        if (pos.isEmpty()) return null;
+
+        try {
+            return Position.valueOf(pos.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            // enum에 없는 값 (예: "N/A", "NONE", "-", "가드", "null")
+            return null;
+        }
+    }
+
 
     /** 자체전 생성 */
     @Transactional
