@@ -11,19 +11,19 @@ import lombok.AllArgsConstructor;
 @Schema(description = "자체전 생성 요청 DTO")
 public class CreateScrimmageRequest {
 
-    @Schema(description = "홈 팀 ID", example = "1")
-    private Long homeTeamId;
+    @Schema(description = "홈 팀 이름", example = "1")
+    private String homeTeamName;
 
-    @Schema(description = "원정 팀 ID", example = "2")
-    private Long awayTeamId;
+    @Schema(description = "원정 팀 이름", example = "2")
+    private String awayTeamName;
 
     @Schema(description = "경기 장소 (optional)", example = "강남체육관")
     private String venueName;
 
     // 스크림용 단축 생성자 (venueName 없이)
-    public CreateScrimmageRequest(Long homeTeamId, Long awayTeamId) {
-        this.homeTeamId = homeTeamId;
-        this.awayTeamId = awayTeamId;
+    public CreateScrimmageRequest(String homeTeamName, String awayTeamName) {
+        this.homeTeamName = homeTeamName;
+        this.awayTeamName = awayTeamName;
         this.venueName = null;
     }
 }

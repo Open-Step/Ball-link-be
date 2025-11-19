@@ -15,11 +15,8 @@ import java.util.List;
 @Schema(description = "자체전 생성 + 엔트리 등록 요청 DTO")
 public class InitiateScrimmageRequest {
 
-    @Schema(description = "홈 팀 ID", example = "1")
-    private Long homeTeamId;
-
-    @Schema(description = "원정 팀 ID", example = "2")
-    private Long awayTeamId;
+    private String homeTeamName;
+    private String awayTeamName;
 
     @Schema(description = "홈팀 선수 목록")
     private List<AddEntryRequest.EntryPlayerDto> homePlayers;
