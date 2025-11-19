@@ -150,13 +150,13 @@ public class StateBuilder {
 
         Map<String, Object> homeBlock = new HashMap<>();
         homeBlock.put("teamId", game.getHomeTeam().getId());
-        homeBlock.put("teamName", game.getHomeTeam().getName());
+        homeBlock.put("teamName", game.getHomeTeamName());
         homeBlock.put("stat", homeStat);       // ✔ 서로 다른 객체
         homeBlock.put("players", homePlayers);
 
         Map<String, Object> awayBlock = new HashMap<>();
         awayBlock.put("teamId", game.getAwayTeam().getId());
-        awayBlock.put("teamName", game.getAwayTeam().getName());
+        awayBlock.put("teamName", game.getAwayTeamName());
         awayBlock.put("stat", awayStat);       // ✔ 서로 다른 객체
         awayBlock.put("players", awayPlayers);
 

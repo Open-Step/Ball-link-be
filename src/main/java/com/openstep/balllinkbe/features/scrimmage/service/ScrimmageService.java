@@ -40,21 +40,17 @@ public class ScrimmageService {
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
 
 
-    /** ✔ 자체전 원샷 처리 (팀 생성 + 게임 생성 + 엔트리 저장 + 세션발급) */
+    /** 자체전 원샷 */
     @Transactional
     public InitiateScrimmageResponse initiateScrimmage(InitiateScrimmageRequest req, User currentUser) {
 
-        // 1) 자체전용 게임 생성 (가상팀 포함)
         Long gameId = createScrimmage(
                 new CreateScrimmageRequest(req.getHomeTeamName(), req.getAwayTeamName()),
                 currentUser
         );
 
-        // 2) 엔트리 저장
-        var entryReq = new AddEntryRequest(req.getHomePlayers(), req.getAwayPlayers());
-        saveEntries(gameId, entryReq, currentUser);
+        saveEntries(gameId, new AddEntryRequest(req.getHomePlayers(), req.getAwayPlayers()), currentUser);
 
-        // 3) 세션 발급
         String sessionToken = createScoreSession(gameId, currentUser);
 
         return new InitiateScrimmageResponse(gameId, sessionToken);
@@ -63,17 +59,26 @@ public class ScrimmageService {
 
     /** ✔ 가상 팀 생성 메서드 */
     private Team createVirtualTeam(String teamName, User owner) {
+        String tag = generateVirtualTag(); // 0001 ~ 9999
+
         Team t = Team.builder()
-                .name(teamName + " (자체전)")
-                .ownerUser(owner)
+                .name(teamName)
+                .teamTag(tag)
+                .shortName(teamName)
                 .isPublic(false)
+                .ownerUser(owner)
                 .createdAt(LocalDateTime.now())
                 .build();
+
         return teamRepository.save(t);
     }
 
+    private String generateVirtualTag() {
+        int n = (int)(Math.random() * 9000) + 1000; // 1000~9999
+        return String.valueOf(n);
+    }
 
-    /** ✔ 자체전 게임 생성 (가상 팀 2개 자동 생성) */
+    /** 자체전 게임 생성 - Team 사용 안 함 */
     @Transactional
     public Long createScrimmage(CreateScrimmageRequest req, User currentUser) {
 
@@ -83,6 +88,8 @@ public class ScrimmageService {
         Game game = Game.builder()
                 .homeTeam(home)
                 .awayTeam(away)
+                .homeTeamName(req.getHomeTeamName()) // PDF 용
+                .awayTeamName(req.getAwayTeamName())
                 .isScrimmage(true)
                 .state(Game.State.SCHEDULED)
                 .createdAt(LocalDateTime.now())
@@ -91,6 +98,7 @@ public class ScrimmageService {
         gameRepository.save(game);
         return game.getId();
     }
+
 
     public Long addGuest(Long gameId, CreateGuestRequest req, User currentUser) {
 
@@ -125,15 +133,17 @@ public class ScrimmageService {
         );
     }
 
-    /** ✔ 라인업 저장 */
+    /** 엔트리 저장 */
     @Transactional
     public void saveEntries(Long gameId, AddEntryRequest req, User currentUser) {
 
         lineupRepo.deleteByGameId(gameId);
-
         Game game = gameRepository.getReferenceById(gameId);
 
-        var list = new ArrayList<GameLineupPlayer>();
+        Team homeTeam = game.getHomeTeam();
+        Team awayTeam = game.getAwayTeam();
+
+        List<GameLineupPlayer> list = new ArrayList<>();
 
         // HOME
         if (req.getHomePlayers() != null) {
@@ -145,19 +155,18 @@ public class ScrimmageService {
                     player = playerRepo.getReferenceById(p.getPlayerId());
                 } else {
                     player = Player.builder()
-                            .team(game.getHomeTeam())
+                            .team(homeTeam)                                  // ★ 수정
                             .name(p.getName())
                             .number(p.getNumber() != null ? p.getNumber().shortValue() : null)
                             .isActive(true)
                             .position(parsePosition(p.getPosition()))
                             .build();
-
                     playerRepo.save(player);
                 }
 
                 list.add(GameLineupPlayer.builder()
                         .game(game)
-                        .team(game.getHomeTeam())
+                        .team(homeTeam)                                      // ★ 수정
                         .teamSide(GameLineupPlayer.Side.HOME)
                         .player(player)
                         .number(player.getNumber())
@@ -166,6 +175,7 @@ public class ScrimmageService {
                         .build());
             }
         }
+
 
         // AWAY
         if (req.getAwayPlayers() != null) {
@@ -177,7 +187,7 @@ public class ScrimmageService {
                     player = playerRepo.getReferenceById(p.getPlayerId());
                 } else {
                     player = Player.builder()
-                            .team(game.getAwayTeam())
+                            .team(awayTeam)                                  // ★ 수정
                             .name(p.getName())
                             .number(p.getNumber() != null ? p.getNumber().shortValue() : null)
                             .isActive(true)
@@ -188,7 +198,7 @@ public class ScrimmageService {
 
                 list.add(GameLineupPlayer.builder()
                         .game(game)
-                        .team(game.getAwayTeam())
+                        .team(awayTeam)                                      // ★ 수정
                         .teamSide(GameLineupPlayer.Side.AWAY)
                         .player(player)
                         .number(player.getNumber())
@@ -200,7 +210,6 @@ public class ScrimmageService {
 
         lineupRepo.saveAll(list);
     }
-
 
     private Position parsePosition(String pos) {
         if (pos == null) return null;
@@ -214,15 +223,12 @@ public class ScrimmageService {
         }
     }
 
-
-    /** ✔ 세션 생성 */
+    /** 세션 생성 */
     @Transactional
     public String createScoreSession(Long gameId, User currentUser) {
 
         var existing = scoreSessionRepository.findByGameId(gameId);
-        if (existing.isPresent()) {
-            return existing.get().getSessionToken();
-        }
+        if (existing.isPresent()) return existing.get().getSessionToken();
 
         var session = ScoreSession.builder()
                 .gameId(gameId)
@@ -257,8 +263,8 @@ public class ScrimmageService {
 
         return ScrimmageDetailResponse.builder()
                 .gameId(game.getId())
-                .homeTeamName(game.getHomeTeam().getName())
-                .awayTeamName(game.getAwayTeam().getName())
+                .homeTeamName(game.getHomeTeamName())
+                .awayTeamName(game.getAwayTeamName())
                 .venueName(game.getVenue() != null ? game.getVenue().getName() : null)
                 .state(game.getState().name())
                 .startedAt(game.getStartedAt())
@@ -267,10 +273,9 @@ public class ScrimmageService {
                 .build();
     }
 
-
     private ScrimmageDetailResponse.PlayerLineup convertLineup(GameLineupPlayer p) {
 
-        boolean isGuest = (p.getPlayer() == null);
+        boolean isGuest = p.getPlayer() == null;
 
         Integer number = isGuest
                 ? (p.getGuestNumber() != null ? p.getGuestNumber().intValue() : null)
@@ -286,7 +291,6 @@ public class ScrimmageService {
                 .teamSide(p.getTeamSide().name())
                 .build();
     }
-
 
     /** 종료 */
     @Transactional
