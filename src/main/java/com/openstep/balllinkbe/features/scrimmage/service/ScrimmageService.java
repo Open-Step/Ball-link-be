@@ -35,35 +35,100 @@ public class ScrimmageService {
     private final GameRepository gameRepository;
     private final ScoreSessionRepository scoreSessionRepository;
     private final GameLineupPlayerRepository lineupRepo;
-    private final PlayerRepository playerRepo; // 선수 엔티티 필요
+    private final PlayerRepository playerRepo;
 
-    // 인메모리 라인업 저장 (DB 영향 없이)
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
 
-    /** 🔹 원샷 처리 (자체전 생성 + 엔트리 저장 + 세션발급) */
+
+    /** ✔ 자체전 원샷 처리 (팀 생성 + 게임 생성 + 엔트리 저장 + 세션발급) */
     @Transactional
     public InitiateScrimmageResponse initiateScrimmage(InitiateScrimmageRequest req, User currentUser) {
-        // 1️⃣ 자체전 생성
-        var gameId = createScrimmage(
-                new CreateScrimmageRequest(req.getHomeTeamId(), req.getAwayTeamId()),
+
+        // 1) 자체전용 게임 생성 (가상팀 포함)
+        Long gameId = createScrimmage(
+                new CreateScrimmageRequest(req.getHomeTeamName(), req.getAwayTeamName()),
                 currentUser
         );
 
-        // 2️⃣ 엔트리 저장
+        // 2) 엔트리 저장
         var entryReq = new AddEntryRequest(req.getHomePlayers(), req.getAwayPlayers());
         saveEntries(gameId, entryReq, currentUser);
 
-        // 3️⃣ 세션 발급
+        // 3) 세션 발급
         String sessionToken = createScoreSession(gameId, currentUser);
 
         return new InitiateScrimmageResponse(gameId, sessionToken);
     }
 
-    /** 라인업 저장 */
+
+    /** ✔ 가상 팀 생성 메서드 */
+    private Team createVirtualTeam(String teamName, User owner) {
+        Team t = Team.builder()
+                .name(teamName + " (자체전)")
+                .ownerUser(owner)
+                .isPublic(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        return teamRepository.save(t);
+    }
+
+
+    /** ✔ 자체전 게임 생성 (가상 팀 2개 자동 생성) */
+    @Transactional
+    public Long createScrimmage(CreateScrimmageRequest req, User currentUser) {
+
+        Team home = createVirtualTeam(req.getHomeTeamName(), currentUser);
+        Team away = createVirtualTeam(req.getAwayTeamName(), currentUser);
+
+        Game game = Game.builder()
+                .homeTeam(home)
+                .awayTeam(away)
+                .isScrimmage(true)
+                .state(Game.State.SCHEDULED)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        gameRepository.save(game);
+        return game.getId();
+    }
+
+    public Long addGuest(Long gameId, CreateGuestRequest req, User currentUser) {
+
+        var guests = guestMap.computeIfAbsent(gameId, __ -> new ArrayList<>());
+
+        long guestId = System.currentTimeMillis();
+
+        guests.add(
+                ScrimmageDetailResponse.PlayerLineup.builder()
+                        .playerId(guestId)
+                        .name(req.getName())
+                        .number(req.getNumber())
+                        .position(req.getPosition())
+                        .starter(false)
+                        .guest(true)
+                        .teamSide(req.getTeamSide() != null ? req.getTeamSide() : "HOME")
+                        .build()
+        );
+
+        return guestId;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getScoreSession(Long gameId) {
+        var session = scoreSessionRepository.findByGameId(gameId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
+
+        return Map.of(
+                "token", session.getSessionToken(),
+                "createdAt", session.getCreatedAt(),
+                "isActive", session.getExpiresAt() == null || session.getExpiresAt().isAfter(LocalDateTime.now())
+        );
+    }
+
+    /** ✔ 라인업 저장 */
     @Transactional
     public void saveEntries(Long gameId, AddEntryRequest req, User currentUser) {
 
-        // 기존 라인업 삭제
         lineupRepo.deleteByGameId(gameId);
 
         Game game = gameRepository.getReferenceById(gameId);
@@ -77,21 +142,16 @@ public class ScrimmageService {
                 Player player;
 
                 if (p.getPlayerId() != null) {
-                    // 기존 팀 선수
                     player = playerRepo.getReferenceById(p.getPlayerId());
                 } else {
-                    // 게스트 선수 → 새로운 Player 엔티티 생성
                     player = Player.builder()
                             .team(game.getHomeTeam())
                             .name(p.getName())
-                            .number(
-                                    p.getPlayerId() != null && p.getNumber() != null
-                                            ? p.getNumber().shortValue()
-                                            : null
-                            )
+                            .number(p.getNumber() != null ? p.getNumber().shortValue() : null)
                             .isActive(true)
                             .position(parsePosition(p.getPosition()))
                             .build();
+
                     playerRepo.save(player);
                 }
 
@@ -119,11 +179,7 @@ public class ScrimmageService {
                     player = Player.builder()
                             .team(game.getAwayTeam())
                             .name(p.getName())
-                            .number(
-                                    p.getPlayerId() != null && p.getNumber() != null
-                                            ? p.getNumber().shortValue()
-                                            : null
-                            )
+                            .number(p.getNumber() != null ? p.getNumber().shortValue() : null)
                             .isActive(true)
                             .position(parsePosition(p.getPosition()))
                             .build();
@@ -145,73 +201,55 @@ public class ScrimmageService {
         lineupRepo.saveAll(list);
     }
 
+
     private Position parsePosition(String pos) {
         if (pos == null) return null;
-
-        // 공백/쓰레기 입력 방어
         pos = pos.trim();
         if (pos.isEmpty()) return null;
 
         try {
             return Position.valueOf(pos.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            // enum에 없는 값 (예: "N/A", "NONE", "-", "가드", "null")
+        } catch (Exception e) {
             return null;
         }
     }
 
 
-    /** 자체전 생성 */
+    /** ✔ 세션 생성 */
     @Transactional
-    public Long createScrimmage(CreateScrimmageRequest req, User currentUser) {
-        Team home = teamRepository.findById(req.getHomeTeamId())
-                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
-        Team away = teamRepository.findById(req.getAwayTeamId())
-                .orElseThrow(() -> new CustomException(ErrorCode.TEAM_NOT_FOUND));
+    public String createScoreSession(Long gameId, User currentUser) {
 
-        Game game = Game.builder()
-                .homeTeam(home)
-                .awayTeam(away)
-                .isScrimmage(true)
-                .state(Game.State.SCHEDULED)
+        var existing = scoreSessionRepository.findByGameId(gameId);
+        if (existing.isPresent()) {
+            return existing.get().getSessionToken();
+        }
+
+        var session = ScoreSession.builder()
+                .gameId(gameId)
+                .createdBy(currentUser)
+                .sessionToken("SCR-" + gameId + "-" + System.currentTimeMillis())
                 .createdAt(LocalDateTime.now())
+                .expiresAt(null)
                 .build();
 
-        gameRepository.save(game);
-        return game.getId();
+        scoreSessionRepository.save(session);
+        return session.getSessionToken();
     }
 
-    /** 게스트 추가 */
-    public Long addGuest(Long gameId, CreateGuestRequest req, User currentUser) {
-        var guests = guestMap.computeIfAbsent(gameId, __ -> new java.util.ArrayList<>());
-        long guestId = System.currentTimeMillis();
-        guests.add(ScrimmageDetailResponse.PlayerLineup.builder()
-                .playerId(guestId)
-                .name(req.getName())
-                .number(req.getNumber())
-                .position(req.getPosition())
-                .starter(false)
-                .guest(true)
-                .teamSide("HOME") // 기본 HOME으로 처리 (필요시 프론트에서 지정 가능)
-                .build());
-        return guestId;
-    }
 
-    /** 상세 조회 */
+    /** 상세 조회 (기존 유지) */
     public ScrimmageDetailResponse getScrimmageDetail(Long gameId) {
+
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
 
-        // 🔥 DB 라인업 조회
         List<GameLineupPlayer> dbLineup = lineupRepo.findByGameId(gameId);
 
-        // HOME
         var home = dbLineup.stream()
                 .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.HOME)
                 .map(this::convertLineup)
                 .toList();
 
-        // AWAY
         var away = dbLineup.stream()
                 .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.AWAY)
                 .map(this::convertLineup)
@@ -229,22 +267,19 @@ public class ScrimmageService {
                 .build();
     }
 
-    /** GameLineupPlayer → ScrimmageDetailResponse.PlayerLineup 변환 */
+
     private ScrimmageDetailResponse.PlayerLineup convertLineup(GameLineupPlayer p) {
+
         boolean isGuest = (p.getPlayer() == null);
 
-        // Short → Integer 변환
-        Integer number = null;
-        if (isGuest) {
-            number = p.getGuestNumber() != null ? p.getGuestNumber().intValue() : null;
-        } else {
-            number = p.getNumber() != null ? p.getNumber().intValue() : null;
-        }
+        Integer number = isGuest
+                ? (p.getGuestNumber() != null ? p.getGuestNumber().intValue() : null)
+                : (p.getNumber() != null ? p.getNumber().intValue() : null);
 
         return ScrimmageDetailResponse.PlayerLineup.builder()
                 .playerId(isGuest ? null : p.getPlayer().getId())
                 .name(isGuest ? p.getGuestName() : p.getPlayer().getName())
-                .number(number)  // ← Integer로 변환된 값
+                .number(number)
                 .position(p.getPosition() != null ? p.getPosition().name() : null)
                 .starter(p.isStarter())
                 .guest(isGuest)
@@ -253,54 +288,17 @@ public class ScrimmageService {
     }
 
 
-    /** 스코어 세션 생성 */
-    @Transactional
-    public String createScoreSession(Long gameId, User currentUser) {
-        var existing = scoreSessionRepository.findByGameId(gameId);
-        if (existing.isPresent()) {
-            return existing.get().getSessionToken();
-        }
-
-        var session = ScoreSession.builder()
-                .gameId(gameId)
-                .createdBy(currentUser)
-                .sessionToken("SCR-" + gameId + "-" + System.currentTimeMillis())
-                .createdAt(LocalDateTime.now())
-                .expiresAt(null) // 🔥 ACTIVE 로 인식되도록 설정
-                .build();
-
-        scoreSessionRepository.save(session);
-        return session.getSessionToken();
-    }
-
-
-
-    /** 스코어 세션 조회 */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getScoreSession(Long gameId) {
-        var session = scoreSessionRepository.findByGameId(gameId)
-                .orElseThrow(() -> new CustomException(ErrorCode.SESSION_NOT_FOUND));
-
-        return Map.of(
-                "token", session.getSessionToken(),
-                "createdAt", session.getCreatedAt(),
-                "isActive", session.getExpiresAt().isAfter(LocalDateTime.now())
-        );
-    }
-
-
     /** 종료 */
     @Transactional
     public void endScrimmage(Long gameId, User currentUser) {
+
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new CustomException(ErrorCode.GAME_NOT_FOUND));
-        if (!game.isScrimmage()) throw new CustomException(ErrorCode.INVALID_GAME_TYPE);
+
+        if (!game.isScrimmage())
+            throw new CustomException(ErrorCode.INVALID_GAME_TYPE);
 
         game.setState(Game.State.FINISHED);
         game.setFinishedAt(LocalDateTime.now());
     }
-    public List<ScrimmageDetailResponse.PlayerLineup> getLineupRaw(Long gameId) {
-        return guestMap.getOrDefault(gameId, List.of());
-    }
-
 }

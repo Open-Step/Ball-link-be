@@ -2,6 +2,7 @@ package com.openstep.balllinkbe.domain.team;
 
 import com.openstep.balllinkbe.domain.user.User;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -60,5 +61,40 @@ public class Team {
     /** ID-only 생성자 (프록시용) */
     public Team(Long id) {
         this.id = id;
+    }
+
+    /** -------------------------
+     *        BUILDER 추가
+     *  -------------------------
+     */
+    @Builder
+    public Team(
+            Long id,
+            String name,
+            String teamTag,
+            String shortName,
+            LocalDate foundedAt,
+            String region,
+            String description,
+            Boolean isPublic,
+            String emblemUrl,
+            User ownerUser,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt,
+            LocalDateTime deletedAt
+    ) {
+        this.id = id;
+        this.name = name;
+        this.teamTag = teamTag;
+        this.shortName = shortName;
+        this.foundedAt = foundedAt;
+        this.region = region;
+        this.description = description;
+        this.isPublic = isPublic;
+        this.emblemUrl = emblemUrl;
+        this.ownerUser = ownerUser;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
     }
 }
