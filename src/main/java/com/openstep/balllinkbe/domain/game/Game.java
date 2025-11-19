@@ -54,4 +54,11 @@ public class Game {
 
     public enum RoundCode { GROUP, ROUND_OF_16, QF, SF, FINAL }
     public enum State { SCHEDULED, ONGOING, FINISHED, CANCELED }
+
+    @Column(name = "home_team_name")
+    private String homeTeamName;
+
+    @Column(name = "away_team_name")
+    private String awayTeamName;
+
 }
