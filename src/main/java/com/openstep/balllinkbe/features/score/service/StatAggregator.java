@@ -70,19 +70,24 @@ public class StatAggregator {
                 playerRepo.save(stat);
             }
 
-            // 어시스트 스탯 (선택)
+            // 어시스트 스탯 (score 이벤트에 assistId 가 들어오는 경우)
             if (assistId != null) {
                 Player assister = em.getReference(Player.class, assistId);
                 GamePlayerStat a = getOrCreatePlayerStat(game, assister);
                 a.setAst(a.getAst() + 1);
                 playerRepo.save(a);
+
+                // 팀 어시스트도 올려 줄 거면
+                GameTeamStat assistTeam = getOrCreateTeamStat(game, assister.getTeam());
+                assistTeam.setAst(assistTeam.getAst() + 1);
+                teamRepo.save(assistTeam);
             }
 
             log.info("[Score] +{} pts | team={} player={}",
                     pts, team.getName(), scorer != null ? scorer.getName() : "-");
 
         } catch (Exception e) {
-            log.error("Error applying score stat: {}", e.getMessage());
+            log.error("Error applying score stat: {}", e.getMessage(), e);
         }
     }
 
@@ -99,12 +104,7 @@ public class StatAggregator {
             Game game = em.getReference(Game.class, gameId);
             Team team = getTeamBySide(game, teamSide);
 
-            Player player = null;
-            if (playerId != null) {
-                player = em.getReference(Player.class, playerId);
-            } else if (number != null) {
-                player = playerDirectory.findByTeamIdAndNumberAndIsActiveTrue(team.getId(), number).orElse(null);
-            }
+            Player player = resolvePlayer(game, team, playerId, number);
 
             // 팀 파울 누적
             GameTeamStat teamStat = getOrCreateTeamStat(game, team);
@@ -121,7 +121,97 @@ public class StatAggregator {
             log.info("[Foul] team={} player={}", team.getName(), player != null ? player.getName() : "-");
 
         } catch (Exception e) {
-            log.error("Error applying foul stat: {}", e.getMessage());
+            log.error("Error applying foul stat: {}", e.getMessage(), e);
+        }
+    }
+
+    /* ===========================================================
+       어시스트 이벤트 (assist.add)
+       data: { playerId }
+       =========================================================== */
+    @Transactional
+    public void applyAssist(Long gameId, Map<String, Object> data) {
+        try {
+            Long playerId = data.get("playerId") != null ? ((Number) data.get("playerId")).longValue() : null;
+            if (playerId == null) return;
+
+            Game game = em.getReference(Game.class, gameId);
+            Player player = em.getReference(Player.class, playerId);
+            Team team = player.getTeam();
+
+            GameTeamStat teamStat = getOrCreateTeamStat(game, team);
+            teamStat.setAst(teamStat.getAst() + 1);
+            teamRepo.save(teamStat);
+
+            GamePlayerStat stat = getOrCreatePlayerStat(game, player);
+            stat.setAst(stat.getAst() + 1);
+            playerRepo.save(stat);
+
+            log.info("[Assist] team={} player={}", team.getName(), player.getName());
+        } catch (Exception e) {
+            log.error("Error applying assist stat: {}", e.getMessage(), e);
+        }
+    }
+
+    /* ===========================================================
+       스틸 이벤트 (steal.add)
+       data: { team, playerId|number }
+       =========================================================== */
+    @Transactional
+    public void applySteal(Long gameId, Map<String, Object> data) {
+        try {
+            String teamSide = (String) data.getOrDefault("team", null);
+            Long playerId = data.get("playerId") != null ? ((Number) data.get("playerId")).longValue() : null;
+            Short number   = data.get("number")   != null ? ((Number) data.get("number")).shortValue()   : null;
+
+            Game game = em.getReference(Game.class, gameId);
+            Team team = getTeamBySide(game, teamSide);
+            Player player = resolvePlayer(game, team, playerId, number);
+
+            GameTeamStat teamStat = getOrCreateTeamStat(game, team);
+            teamStat.setStl(teamStat.getStl() + 1);
+            teamRepo.save(teamStat);
+
+            if (player != null) {
+                GamePlayerStat stat = getOrCreatePlayerStat(game, player);
+                stat.setStl(stat.getStl() + 1);
+                playerRepo.save(stat);
+            }
+
+            log.info("[Steal] team={} player={}", team.getName(), player != null ? player.getName() : "-");
+        } catch (Exception e) {
+            log.error("Error applying steal stat: {}", e.getMessage(), e);
+        }
+    }
+
+    /* ===========================================================
+       블록 이벤트 (block.add)
+       data: { team, playerId|number }
+       =========================================================== */
+    @Transactional
+    public void applyBlock(Long gameId, Map<String, Object> data) {
+        try {
+            String teamSide = (String) data.getOrDefault("team", null);
+            Long playerId = data.get("playerId") != null ? ((Number) data.get("playerId")).longValue() : null;
+            Short number   = data.get("number")   != null ? ((Number) data.get("number")).shortValue()   : null;
+
+            Game game = em.getReference(Game.class, gameId);
+            Team team = getTeamBySide(game, teamSide);
+            Player player = resolvePlayer(game, team, playerId, number);
+
+            GameTeamStat teamStat = getOrCreateTeamStat(game, team);
+            teamStat.setBlk(teamStat.getBlk() + 1);
+            teamRepo.save(teamStat);
+
+            if (player != null) {
+                GamePlayerStat stat = getOrCreatePlayerStat(game, player);
+                stat.setBlk(stat.getBlk() + 1);
+                playerRepo.save(stat);
+            }
+
+            log.info("[Block] team={} player={}", team.getName(), player != null ? player.getName() : "-");
+        } catch (Exception e) {
+            log.error("Error applying block stat: {}", e.getMessage(), e);
         }
     }
 
@@ -137,7 +227,7 @@ public class StatAggregator {
             em.merge(game);
             log.info("Game {} marked as FINISHED", gameId);
         } catch (Exception e) {
-            log.error("❌ Error finalizing game: {}", e.getMessage());
+            log.error("❌ Error finalizing game: {}", e.getMessage(), e);
         }
     }
 
@@ -173,6 +263,21 @@ public class StatAggregator {
         return "HOME".equalsIgnoreCase(side) ? game.getHomeTeam() : game.getAwayTeam();
     }
 
+    /**
+     * playerId 또는 number 기준으로 플레이어 찾기
+     */
+    private Player resolvePlayer(Game game, Team team, Long playerId, Short number) {
+        if (playerId != null) {
+            return em.getReference(Player.class, playerId);
+        }
+        if (number != null && team != null) {
+            return playerDirectory
+                    .findByTeamIdAndNumberAndIsActiveTrue(team.getId(), number)
+                    .orElse(null);
+        }
+        return null;
+    }
+
     @Transactional
     public void applyRebound(Long gameId, Map<String, Object> data) {
         try {
@@ -182,20 +287,14 @@ public class StatAggregator {
 
             Game game = em.getReference(Game.class, gameId);
             Team team = getTeamBySide(game, teamSide);
+            Player player = resolvePlayer(game, team, playerId, number);
 
-            Player player = null;
-            if (playerId != null) {
-                player = em.getReference(Player.class, playerId);
-            } else if (number != null) {
-                player = playerDirectory.findByTeamIdAndNumberAndIsActiveTrue(team.getId(), number).orElse(null);
-            }
-
-            // ✅ 팀 리바운드 (team reb)
+            // 팀 리바운드
             GameTeamStat teamStat = getOrCreateTeamStat(game, team);
             teamStat.setReb(teamStat.getReb() + 1);
             teamRepo.save(teamStat);
 
-            // ✅ 선수 리바운드
+            // 선수 리바운드
             if (player != null) {
                 GamePlayerStat stat = getOrCreatePlayerStat(game, player);
                 stat.setReb(stat.getReb() + 1);
@@ -205,8 +304,7 @@ public class StatAggregator {
             log.info("[Rebound] team={} player={}", team.getName(), player != null ? player.getName() : "-");
 
         } catch (Exception e) {
-            log.error("Error applying rebound stat: {}", e.getMessage());
+            log.error("Error applying rebound stat: {}", e.getMessage(), e);
         }
     }
-
 }

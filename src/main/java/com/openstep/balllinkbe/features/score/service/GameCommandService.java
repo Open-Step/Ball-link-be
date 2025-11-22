@@ -113,6 +113,24 @@ public class GameCommandService {
                 broadcastPbp(gameId, ev);
             }
 
+            case "assist.add" -> {
+                var ev = eventWriter.recordAssist(gameId, data);
+                statAggregator.applyAssist(gameId, data);
+                broadcastPbp(gameId, ev);
+            }
+
+            case "steal.add" -> {
+                var ev = eventWriter.recordSteal(gameId, data);
+                statAggregator.applySteal(gameId, data);
+                broadcastPbp(gameId, ev);
+            }
+
+            case "block.add" -> {
+                var ev = eventWriter.recordBlock(gameId, data);
+                statAggregator.applyBlock(gameId, data);
+                broadcastPbp(gameId, ev);
+            }
+
             default -> log.warn("⚠Unknown action: {}", action);
         }
         return result;
