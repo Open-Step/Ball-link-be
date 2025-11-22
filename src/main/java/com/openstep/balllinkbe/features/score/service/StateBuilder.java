@@ -1,14 +1,10 @@
 package com.openstep.balllinkbe.features.score.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openstep.balllinkbe.domain.game.*;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.features.score.repository.GameEventRepository;
 import com.openstep.balllinkbe.features.score.repository.GamePlayerStatScoreRepository;
 import com.openstep.balllinkbe.features.score.repository.GameTeamStatScoreRepository;
-import com.openstep.balllinkbe.features.scrimmage.dto.response.ScrimmageDetailResponse;
-import com.openstep.balllinkbe.features.scrimmage.service.ScrimmageService;
-import com.openstep.balllinkbe.features.tournament.repository.GameLineupPlayerRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +22,6 @@ public class StateBuilder {
     private final GameTeamStatScoreRepository teamRepo;
     private final GamePlayerStatScoreRepository playerRepo;
     private final GameEventRepository eventRepo;
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final GameLineupPlayerRepository lineupRepo;
-    // 스크리미지 라인업 조회용
-    private final ScrimmageService scrimmageService;
 
     /** 경기 전체 상태 스냅샷 생성 */
     public Map<String, Object> buildSyncState(Long gameId) {
@@ -39,11 +31,6 @@ public class StateBuilder {
             err.put("type", "error");
             err.put("message", "Game not found");
             return err;
-        }
-
-        // 스크리미지면 별도 빌더 사용
-        if (game.isScrimmage()) {
-            return buildScrimmageState(game);
         }
 
         // 일반 토너먼트/리그 경기
@@ -106,102 +93,6 @@ public class StateBuilder {
         out.put("data", data);
 
         return out;
-    }
-
-    private Map<String, Object> toScrimmagePlayer(GameLineupPlayer p) {
-        Map<String, Object> m = new HashMap<>();
-        m.put("playerId", p.getPlayer() != null ? p.getPlayer().getId() : null);
-        m.put("name", p.getPlayer() != null ? p.getPlayer().getName() : p.getGuestName());
-        m.put("number", p.getPlayer() != null ? p.getNumber() : p.getGuestNumber());
-        m.put("position", p.getPosition() != null ? p.getPosition().name() : null);
-
-        // 스탯 초기값
-        m.put("pts", 0);
-        m.put("reb", 0);
-        m.put("ast", 0);
-        m.put("stl", 0);
-        m.put("blk", 0);
-        m.put("pf", 0);
-        m.put("tov", 0);
-        return m;
-    }
-
-    /** 스크리미지 전용 상태 생성 */
-    private Map<String, Object> buildScrimmageState(Game game) {
-        Long gameId = game.getId();
-
-        List<GameLineupPlayer> lineup = lineupRepo.findByGameId(gameId);
-
-        var homePlayers = lineup.stream()
-                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.HOME)
-                .map(this::toScrimmagePlayer)
-                .toList();
-
-        var awayPlayers = lineup.stream()
-                .filter(p -> p.getTeamSide() == GameLineupPlayer.Side.AWAY)
-                .map(this::toScrimmagePlayer)
-                .toList();
-
-        // 각각 새로운 객체로 생성해야 한다
-        Map<String, Object> homeStat = new HashMap<>();
-        Map<String, Object> awayStat = new HashMap<>();
-        initZeroStat(homeStat);
-        initZeroStat(awayStat);
-
-        Map<String, Object> homeBlock = new HashMap<>();
-        homeBlock.put("teamId", game.getHomeTeam().getId());
-        homeBlock.put("teamName", game.getHomeTeamName());
-        homeBlock.put("stat", homeStat);       // ✔ 서로 다른 객체
-        homeBlock.put("players", homePlayers);
-
-        Map<String, Object> awayBlock = new HashMap<>();
-        awayBlock.put("teamId", game.getAwayTeam().getId());
-        awayBlock.put("teamName", game.getAwayTeamName());
-        awayBlock.put("stat", awayStat);       // ✔ 서로 다른 객체
-        awayBlock.put("players", awayPlayers);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("gameId", gameId);
-        data.put("period", 1);
-        data.put("home", homeBlock);
-        data.put("away", awayBlock);
-        data.put("clock", Map.of("running", false, "timeRemaining", "10:00"));
-        data.put("quarters", Map.of(1, 0, 2, 0, 3, 0, 4, 0));
-
-        Map<String, Object> out = new HashMap<>();
-        out.put("type", "state");
-        out.put("action", "state.sync");
-        out.put("data", data);
-
-        return out;
-    }
-
-    private void initZeroStat(Map<String, Object> stat) {
-        stat.put("pts", 0);
-        stat.put("reb", 0);
-        stat.put("ast", 0);
-        stat.put("pf", 0);
-        stat.put("stl", 0);
-        stat.put("blk", 0);
-        stat.put("tov", 0);
-    }
-
-    /** 스크리미지용 선수 변환 */
-    private Map<String, Object> toScrimmagePlayer(ScrimmageDetailResponse.PlayerLineup p) {
-        Map<String, Object> m = new HashMap<>();
-        m.put("playerId", p.getPlayerId());
-        m.put("name", p.getName());
-        m.put("number", p.getNumber());
-        m.put("position", p.getPosition());
-        // 스탯은 일단 0으로 시작, 진행 중에 StatAggregator 가 채워 넣을 수 있음
-        m.put("pts", 0);
-        m.put("reb", 0);
-        m.put("ast", 0);
-        m.put("stl", 0);
-        m.put("blk", 0);
-        m.put("pf", 0);
-        m.put("tov", 0);
-        return m;
     }
 
     /** 팀 스탯 변환 (Null 안전) */
