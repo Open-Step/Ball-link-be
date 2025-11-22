@@ -2,11 +2,13 @@ package com.openstep.balllinkbe.features.scrimmage.service;
 
 import com.openstep.balllinkbe.domain.game.Game;
 import com.openstep.balllinkbe.domain.game.GameLineupPlayer;
+import com.openstep.balllinkbe.domain.game.GamePlayerStat;
 import com.openstep.balllinkbe.domain.score.ScoreSession;
 import com.openstep.balllinkbe.domain.team.Player;
 import com.openstep.balllinkbe.domain.team.Team;
 import com.openstep.balllinkbe.domain.team.enums.Position;
 import com.openstep.balllinkbe.domain.user.User;
+import com.openstep.balllinkbe.features.score.repository.GamePlayerStatScoreRepository;
 import com.openstep.balllinkbe.features.score.repository.ScoreSessionRepository;
 import com.openstep.balllinkbe.features.scrimmage.dto.request.*;
 import com.openstep.balllinkbe.features.scrimmage.dto.response.InitiateScrimmageResponse;
@@ -36,7 +38,7 @@ public class ScrimmageService {
     private final ScoreSessionRepository scoreSessionRepository;
     private final GameLineupPlayerRepository lineupRepo;
     private final PlayerRepository playerRepo;
-
+    private final GamePlayerStatScoreRepository gamePlayerStatRepository;
     private final Map<Long, List<ScrimmageDetailResponse.PlayerLineup>> guestMap = new ConcurrentHashMap<>();
 
 
@@ -100,26 +102,50 @@ public class ScrimmageService {
     }
 
 
+    @Transactional
     public Long addGuest(Long gameId, CreateGuestRequest req, User currentUser) {
 
-        var guests = guestMap.computeIfAbsent(gameId, __ -> new ArrayList<>());
+        Game game = gameRepository.getReferenceById(gameId);
+        Team team = "HOME".equals(req.getTeamSide()) ? game.getHomeTeam() : game.getAwayTeam();
 
-        long guestId = System.currentTimeMillis();
+        // 실제 Player 엔티티 생성
+        Player guest = Player.builder()
+                .team(team)
+                .name(req.getName())
+                .number(req.getNumber() != null ? req.getNumber().shortValue() : null)
+                .position(parsePosition(req.getPosition()))
+                .isActive(true)
+                .build();
 
-        guests.add(
-                ScrimmageDetailResponse.PlayerLineup.builder()
-                        .playerId(guestId)
-                        .name(req.getName())
-                        .number(req.getNumber())
-                        .position(req.getPosition())
-                        .starter(false)
-                        .guest(true)
-                        .teamSide(req.getTeamSide() != null ? req.getTeamSide() : "HOME")
+        playerRepo.save(guest);
+
+        // lineup에 넣기
+        GameLineupPlayer lp = GameLineupPlayer.builder()
+                .game(game)
+                .team(team)
+                .teamSide("HOME".equals(req.getTeamSide()) ?
+                        GameLineupPlayer.Side.HOME : GameLineupPlayer.Side.AWAY)
+                .player(guest)
+                .number(guest.getNumber())
+                .position(guest.getPosition())
+                .isStarter(false)
+                .build();
+
+        lineupRepo.save(lp);
+
+        // GamePlayerStat 생성 (PDF 포함)
+        gamePlayerStatRepository.save(
+                GamePlayerStat.builder()
+                        .game(game)
+                        .team(team)
+                        .player(guest)
+                        .pts(0).reb(0).ast(0).pf(0).stl(0).blk(0).tov(0)
                         .build()
         );
 
-        return guestId;
+        return guest.getId();
     }
+
 
     @Transactional(readOnly = true)
     public Map<String, Object> getScoreSession(Long gameId) {
@@ -209,6 +235,18 @@ public class ScrimmageService {
         }
 
         lineupRepo.saveAll(list);
+        // 자체전 선수 라인업 저장 후 기본 스탯 생성
+        for (GameLineupPlayer lp : list) {
+            GamePlayerStat stat = GamePlayerStat.builder()
+                    .game(game)
+                    .team(lp.getTeam())
+                    .player(lp.getPlayer())   // guest인 경우 player=null → guest player 전용 로직 필요
+                    .pts(0).reb(0).ast(0).pf(0).stl(0).blk(0).tov(0)
+                    .build();
+
+            gamePlayerStatRepository.save(stat);
+        }
+
     }
 
     private Position parsePosition(String pos) {
