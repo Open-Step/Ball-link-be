@@ -103,6 +103,18 @@ public class GameEventWriter {
         return saveEvent(gameId, GameEvent.EventType.GAME_FINISH, data);
     }
 
+    public GameEvent recordAssist(Long gameId, Map<String,Object> data) {
+        return saveEvent(gameId, GameEvent.EventType.ASSIST, data);
+    }
+
+    public GameEvent recordSteal(Long gameId, Map<String,Object> data) {
+        return saveEvent(gameId, GameEvent.EventType.STEAL, data);
+    }
+
+    public GameEvent recordBlock(Long gameId, Map<String,Object> data) {
+        return saveEvent(gameId, GameEvent.EventType.BLOCK, data);
+    }
+
     public Map<String, Object> toPbpEvent(GameEvent ev) {
         Map<String, Object> data = new HashMap<>();
         data.put("eventId", ev.getId());
