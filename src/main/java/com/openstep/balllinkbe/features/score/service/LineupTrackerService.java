@@ -1,7 +1,6 @@
 package com.openstep.balllinkbe.features.score.service;
 
 import com.openstep.balllinkbe.domain.game.Game;
-import com.openstep.balllinkbe.domain.game.GamePlayerStat;
 import com.openstep.balllinkbe.features.score.repository.GamePlayerStatScoreRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -12,7 +11,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -20,74 +20,97 @@ import java.util.*;
 public class LineupTrackerService {
 
     private final EntityManager em;
-    private final GamePlayerStatScoreRepository statRepo; // 변경됨
+    private final GamePlayerStatScoreRepository statRepo;
 
+    // gameId -> (playerId -> 코트에 들어온 시각)
     private final Map<Long, Map<Long, LocalDateTime>> onCourtMap = new HashMap<>();
-    private final Map<Long, Map<Long, Duration>> totalPlayMap = new HashMap<>();
+    // gameId -> (playerId -> 누적 초)
+    private final Map<Long, Map<Long, Long>> totalSecondsMap = new HashMap<>();
 
-    /** 교체 발생 시 반영 */
-    public void updateLineup(Long gameId, Map<String, Object> data) {
-        Long outId = data.get("outPlayerId") != null ? ((Number) data.get("outPlayerId")).longValue() : null;
-        Long inId  = data.get("inPlayerId")  != null ? ((Number) data.get("inPlayerId")).longValue()  : null;
+    /**
+     * 선수 교체 이벤트 처리
+     * data: { outPlayerId / playerOut / out,  inPlayerId / playerIn / in }
+     */
+    public void updateLineup(Long gameId, Map<String, Object> data, LocalDateTime eventTs) {
+        Long outId = extractPlayerId(data, "outPlayerId", "playerOut", "out");
+        Long inId  = extractPlayerId(data, "inPlayerId",  "playerIn",  "in");
 
         var onCourt = onCourtMap.computeIfAbsent(gameId, k -> new HashMap<>());
-        var totals  = totalPlayMap.computeIfAbsent(gameId, k -> new HashMap<>());
+        var totals  = totalSecondsMap.computeIfAbsent(gameId, k -> new HashMap<>());
 
-        LocalDateTime now = LocalDateTime.now();
-
+        // 나가는 선수 시간 누적
         if (outId != null && onCourt.containsKey(outId)) {
-            Duration played = Duration.between(onCourt.get(outId), now);
-            totals.put(outId, totals.getOrDefault(outId, Duration.ZERO).plus(played));
-            onCourt.remove(outId);
-            log.info("⛹️‍♂️ OUT: player {} played {}s", outId, played.getSeconds());
+            LocalDateTime enterAt = onCourt.remove(outId);
+            long seconds = Duration.between(enterAt, eventTs).getSeconds();
+            if (seconds > 0) {
+                totals.merge(outId, seconds, Long::sum);
+            }
+            log.info("⛹️ OUT player {} +{}s (total {}s)", outId, seconds, totals.get(outId));
         }
 
+        // 들어오는 선수 입장 시각 기록
         if (inId != null) {
-            onCourt.put(inId, now);
-            log.info("🏀 IN: player {} joined at {}", inId, now);
+            onCourt.put(inId, eventTs);
+            log.info("🏀 IN player {} at {}", inId, eventTs);
         }
     }
 
-    /** 쿼터 시작 시 초기화 */
-    public void onPeriodStart(Long gameId, Map<String, Object> data) {
-        onCourtMap.putIfAbsent(gameId, new HashMap<>());
-        log.info("[Lineup] Period started for game {}", gameId);
+    /**
+     * 쿼터 시작 이벤트 (지금은 로깅만, 필요하면 나중에 확장)
+     */
+    public void onPeriodStart(Long gameId, Map<String, Object> data, LocalDateTime eventTs) {
+        log.info("[Lineup] period.start game={}, ts={}", gameId, eventTs);
     }
 
-    /** 쿼터 종료 시 시간 누적 */
-    public void onPeriodEnd(Long gameId, Map<String, Object> data) {
-        LocalDateTime now = LocalDateTime.now();
-        var onCourt = onCourtMap.getOrDefault(gameId, Map.of());
-        var totals  = totalPlayMap.computeIfAbsent(gameId, k -> new HashMap<>());
-
-        onCourt.forEach((pid, inTs) -> {
-            Duration played = Duration.between(inTs, now);
-            totals.put(pid, totals.getOrDefault(pid, Duration.ZERO).plus(played));
-        });
-        log.info("[Lineup] Period ended: added {} players’ playtime", onCourt.size());
+    /**
+     * 쿼터 종료 이벤트 (지금은 로깅만, 필요하면 쿼터별 시간도 나눌 수 있음)
+     */
+    public void onPeriodEnd(Long gameId, Map<String, Object> data, LocalDateTime eventTs) {
+        log.info("[Lineup] period.end game={}, ts={}", gameId, eventTs);
     }
 
-    /** 경기 종료 시 모두 반영 */
+    /**
+     * 경기 종료 시 남아 있는 선수 시간까지 모두 반영하고 DB에 minutes 저장
+     */
     @Transactional
-    public void finalizeLineups(Long gameId) {
-        onPeriodEnd(gameId, Map.of());
-        var totals = totalPlayMap.getOrDefault(gameId, Map.of());
+    public void finalizeLineups(Long gameId, LocalDateTime finishTs) {
+        var onCourt = onCourtMap.getOrDefault(gameId, Map.of());
+        var totals  = totalSecondsMap.computeIfAbsent(gameId, k -> new HashMap<>());
+
+        // 아직 코트에 있는 선수들 시간 정산
+        onCourt.forEach((playerId, enterAt) -> {
+            long seconds = Duration.between(enterAt, finishTs).getSeconds();
+            if (seconds > 0) {
+                totals.merge(playerId, seconds, Long::sum);
+            }
+        });
 
         Game game = em.find(Game.class, gameId);
         if (game == null) return;
 
-        totals.forEach((playerId, duration) -> {
-            double minutes = duration.toSeconds() / 60.0;
-
+        // game_player_stats.minutes 업데이트
+        totals.forEach((playerId, totalSeconds) -> {
+            double minutes = totalSeconds / 60.0;
             statRepo.findByGameAndPlayerId(game, playerId).ifPresent(stat -> {
                 stat.setMinutes(BigDecimal.valueOf(minutes));
                 statRepo.save(stat);
-                log.info("📊 Player {} total playtime = {} min", playerId, minutes);
             });
+            log.info("📊 player {} total playtime {}s ({} min)", playerId, totalSeconds, minutes);
         });
 
-        log.info("📊 Finalized lineup minutes saved for {} players", totals.size());
+        // 메모리 정리
         onCourtMap.remove(gameId);
-        totalPlayMap.remove(gameId);
+        totalSecondsMap.remove(gameId);
+        log.info("📊 Finalized lineup minutes for game {}", gameId);
+    }
+
+    private Long extractPlayerId(Map<String, Object> data, String... keys) {
+        for (String key : keys) {
+            Object v = data.get(key);
+            if (v instanceof Number n) {
+                return n.longValue();
+            }
+        }
+        return null;
     }
 }

@@ -52,11 +52,13 @@ public class GameEventWriter {
         String meta = "";
         try { meta = mapper.writeValueAsString(data); } catch (Exception ignored) {}
 
+        int quarter = ((Number) data.getOrDefault("quarter", 1)).intValue();
+
         GameEvent ev = GameEvent.builder()
                 .game(game)
                 .team(team)
                 .player(player)
-                .period((Integer) data.getOrDefault("period", 1))
+                .period(quarter)
                 .clockTime((String) data.getOrDefault("clockTime", null))
                 .teamSide(teamSide)
                 .meta(meta)
