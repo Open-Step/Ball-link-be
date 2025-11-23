@@ -32,14 +32,12 @@ public class GameCommandService {
         String action = (String) message.get("action");
         Map<String, Object> raw = castToMap(message.get("data"));
 
-        // 등번호 기반 playerId 변환
         Map<String, Object> data = switch (action) {
             case "score.add", "foul.add", "rebound.add" -> playerResolver.enrichWithPlayerIds(gameId, raw);
             case "substitution" -> playerResolver.enrichSubstitution(gameId, raw);
             default -> raw;
         };
 
-        log.info("🎮 Handling action: {} for game {}", action, gameId);
         GameResult result = new GameResult();
 
         switch (action) {
@@ -85,19 +83,19 @@ public class GameCommandService {
 
             case "substitution" -> {
                 var ev = eventWriter.recordSubstitution(gameId, data);
-                lineupTracker.updateLineup(gameId, data);
+                lineupTracker.updateLineup(gameId, data, ev.getTs());
                 broadcastPbp(gameId, ev);
             }
 
             case "period.start" -> {
                 var ev = eventWriter.recordPeriodStart(gameId, data);
-                lineupTracker.onPeriodStart(gameId, data);
+                lineupTracker.onPeriodStart(gameId, data, ev.getTs());
                 broadcastPbp(gameId, ev);
             }
 
             case "period.end" -> {
                 var ev = eventWriter.recordPeriodEnd(gameId, data);
-                lineupTracker.onPeriodEnd(gameId, data);
+                lineupTracker.onPeriodEnd(gameId, data, ev.getTs());
                 broadcastPbp(gameId, ev);
             }
 
@@ -108,7 +106,8 @@ public class GameCommandService {
 
             case "game.finish" -> {
                 var ev = eventWriter.recordGameFinish(gameId, data);
-                lineupTracker.finalizeLineups(gameId);
+                // 경기 종료 시점 ts 로 최종 출전시간 정산
+                lineupTracker.finalizeLineups(gameId, ev.getTs());
                 statAggregator.finalizeGame(gameId);
                 broadcastPbp(gameId, ev);
             }
