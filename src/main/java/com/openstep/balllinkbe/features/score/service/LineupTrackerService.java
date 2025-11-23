@@ -60,7 +60,27 @@ public class LineupTrackerService {
      */
     public void onPeriodStart(Long gameId, Map<String, Object> data, LocalDateTime eventTs) {
         log.info("[Lineup] period.start game={}, ts={}", gameId, eventTs);
+
+        var onCourt = onCourtMap.computeIfAbsent(gameId, k -> new HashMap<>());
+        totalSecondsMap.computeIfAbsent(gameId, k -> new HashMap<>());
+
+        // 스타팅 멤버 조회 (GameLineupPlayer 엔티티 기준)
+        var lineup = em.createQuery(
+                        "select lp.player.id from GameLineupPlayer lp " +
+                                "where lp.game.id = :gid and lp.isStarter = true",  // <<< 핵심 수정
+                        Long.class
+                )
+                .setParameter("gid", gameId)
+                .getResultList();
+
+        for (Long playerId : lineup) {
+            if (!onCourt.containsKey(playerId)) {
+                onCourt.put(playerId, eventTs);
+                log.info("PeriodStart → player {} marked IN at {}", playerId, eventTs);
+            }
+        }
     }
+
 
     /**
      * 쿼터 종료 이벤트 (지금은 로깅만, 필요하면 쿼터별 시간도 나눌 수 있음)
