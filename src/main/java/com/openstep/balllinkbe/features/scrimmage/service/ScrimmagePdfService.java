@@ -181,7 +181,7 @@ public class ScrimmagePdfService {
                 .append("</div>")
                 .append("<table class='").append(colorClass).append("'><thead><tr>")
                 .append("<th rowspan='2'>번호</th><th rowspan='2'>이름</th>")
-                .append("<th rowspan='2'>리바운드</th><th rowspan='2'>어시</th><th rowspan='2'>스틸</th><th rowspan='2'>블록</th>")
+                .append("<th rowspan='2'>어시</th><th rowspan='2'>스틸</th><th rowspan='2'>블록</th>")
                 .append("<th colspan='5'>쿼터득점</th><th rowspan='2'>출전</th><th rowspan='2'>총합</th>")
                 .append("</tr><tr>")
                 .append("<th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th><th>OT</th>")
@@ -189,13 +189,10 @@ public class ScrimmagePdfService {
 
         int rebSum = 0;
         for (var p : tb.getPlayers()) {
-            int reb = Optional.ofNullable(p.getReb()).orElse(0);
-            rebSum += reb;
             int[] q = playerQ.getOrDefault(p.getPlayerId(), new int[]{0, 0, 0, 0, 0});
             sb.append("<tr>")
                     .append(td(p.getBackNumber()))
                     .append(td(escape(p.getPlayerName())))
-                    .append(td(reb))
                     .append(td(p.getAst()))
                     .append(td(p.getStl()))
                     .append(td(p.getBlk()))
@@ -208,7 +205,7 @@ public class ScrimmagePdfService {
         int teamSum = Arrays.stream(teamQuarter).sum();
         sb.append("<tr class='totals'>")
                 .append(td("합계")).append(td(""))
-                .append(td(rebSum)).append(td(t.getAst())).append(td(t.getStl())).append(td(t.getBlk()))
+                .append(td(t.getAst())).append(td(t.getStl())).append(td(t.getBlk()))
                 .append(td(teamQuarter[0])).append(td(teamQuarter[1])).append(td(teamQuarter[2])).append(td(teamQuarter[3])).append(td(teamQuarter[4]))
                 .append(td("")).append(td(teamSum)).append("</tr>")
                 .append("</tbody></table>");
