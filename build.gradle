@@ -52,6 +52,7 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-websocket"
     implementation "org.springframework:spring-messaging"
     implementation "com.github.ben-manes.caffeine:caffeine:3.1.8"   // idempotency 캐시
+    implementation 'net.bytebuddy:byte-buddy:1.14.12'
 }
 
 tasks.named('test') {
